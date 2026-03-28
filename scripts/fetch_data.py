@@ -117,7 +117,8 @@ class KickbaseClient:
         if resp.status_code == 200:
             data = resp.json()
             log.info("Ranking-Antwort Keys: %s", list(data.keys()))
-            return data.get("users") or data.get("ranking") or data.get("items") or data.get("u") or data.get("r") or []
+            # 'us' ist der aktuelle v4 Key für 'Users' in der Ranking-Antwort
+            return data.get("us") or data.get("users") or data.get("ranking") or data.get("items") or data.get("r") or []
 
         # Fallback auf älteren Endpunkt
         resp2 = self.session.get(f"{BASE_URL}/leagues/{league_id}/users", timeout=30)
