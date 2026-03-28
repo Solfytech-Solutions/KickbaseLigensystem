@@ -108,24 +108,12 @@ class KickbaseClient:
         log.info("Gefundene Ligen: %d", len(leagues))
         return leagues
 
-    def get_standings(self, league_id: str) -> list[dict]:
-        """Tabellenstände einer Liga (Punkte, Rang, Manager-Name, etc.)."""
-        # v4 Endpunkt
+    def get_standings_raw(self, league_id: str) -> dict:
+        """Holt das komplette Ranking-Objekt (inkl. versteckter Infos)."""
         resp = self.session.get(f"{BASE_URL}/v4/leagues/{league_id}/ranking", timeout=30)
-        log.info("GET /v4/leagues/%s/ranking Status: %s", league_id, resp.status_code)
-        
         if resp.status_code == 200:
-            data = resp.json()
-            # 'us' ist der aktuelle v4 Key für 'Users' in der Ranking-Antwort
-            return data.get("us") or data.get("users") or data.get("ranking") or data.get("items") or data.get("r") or []
-
-        # Fallback auf älteren Endpunkt
-        resp2 = self.session.get(f"{BASE_URL}/leagues/{league_id}/users", timeout=30)
-        if resp2.status_code == 200:
-            return resp2.json().get("users", [])
-
-        log.warning("Standings für Liga %s nicht abrufbar: %s", league_id, resp.status_code)
-        return []
+            return resp.json()
+        return {}
 
     def get_all_players(self, league_id: str) -> list[dict]:
         """Holt den gesamten Spielerpool der Liga (für Meta-Daten Suche)."""
@@ -312,45 +300,45 @@ def main():
 
     # 4. Für jede Liga: Standings + Kader holen und in Firestore schreiben
     for league in leagues:
-        # v4 nutzt oft extrem kurze Keys: i=id, n=name
         league_id = str(league.get("i") or league.get("id") or "")
         league_name = league.get("n") or league.get("name") or league_id
         log.info("── Verarbeite Liga: '%s' (%s) ──", league_name, league_id)
 
         if not league_id:
-            log.warning("Liga-Objekt hat keine ID: %s", league)
             continue
 
-        # Standings
-        raw_standings = kb.get_standings(league_id)
+        # 4a. Komplettes Ranking holen
+        ranking_data = kb.get_standings_raw(league_id)
+        raw_standings = ranking_data.get("us") or ranking_data.get("users") or []
+        
         if not raw_standings:
             log.warning("Keine Standings für Liga %s", league_id)
             continue
 
+        # Debug: Was steckt in 'il' oder 'nd'?
+        il_data = ranking_data.get("il") or []
+        log.info("   'il' (Teams/Info) enthält %d Einträge", len(il_data) if isinstance(il_data, list) else 0)
+        
+        # Mapping bauen aus 'il' (oft sind das die Team/Player-Metadaten in v4)
+        meta_map = {}
+        if isinstance(il_data, list):
+            for item in il_data:
+                iid = str(item.get("i") or item.get("id") or "")
+                if iid:
+                    meta_map[iid] = item
+
         # Sortiere nach Punkten (sp) absteigend
         raw_standings.sort(key=lambda x: x.get("sp") or 0, reverse=True)
-
         cleaned_standings = [_clean_manager(m, i + 1) for i, m in enumerate(raw_standings)]
 
-        if raw_standings:
-            first_m = raw_standings[0]
-            # log.info("Manager-Objekt Full (Debugging): %s", json.dumps(first_m, indent=2))
-            
-        # 4a. Alle Spieler der Liga holen für Metadata-Mapping
+        # 4b. Metadata-Mapping vervollständigen
         all_players_raw = kb.get_all_players(league_id)
         player_map = {str(p.get("i") or p.get("id")): _clean_player(p) for p in all_players_raw}
         
-        # Falls Pool leer, versuchen wir Bulk-Details für die ersten 50 gefundenen IDs
-        if not player_map:
-            all_ids = set()
-            for m in raw_standings:
-                all_ids.update([str(pid) for pid in m.get("lp", [])])
-            if all_ids:
-                log.info("   Pool leer, versuche Details für %d IDs zu laden...", len(all_ids))
-                bulk_data = kb.get_player_details_bulk(list(all_ids))
-                for b_player in bulk_data:
-                    p_clean = _clean_player(b_player)
-                    player_map[p_clean["id"]] = p_clean
+        # Ergänze aus meta_map (il)
+        for iid, m_data in meta_map.items():
+            if iid not in player_map:
+                player_map[iid] = _clean_player(m_data)
 
         log.info("   Spieler-Metadaten geladen: %d Spieler bekannt", len(player_map))
 
