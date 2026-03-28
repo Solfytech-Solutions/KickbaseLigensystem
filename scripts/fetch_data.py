@@ -129,16 +129,35 @@ class KickbaseClient:
 
     def get_all_players(self, league_id: str) -> list[dict]:
         """Holt den gesamten Spielerpool der Liga (für Meta-Daten Suche)."""
-        # Versuch v4 Pool
-        resp = self.session.get(f"{BASE_URL}/v4/leagues/{league_id}/players", timeout=30)
-        if resp.status_code == 200:
-            return resp.json().get("players") or resp.json().get("items") or []
+        # Versuch v4 Pool Varianten
+        urls = [
+            f"{BASE_URL}/v4/leagues/{league_id}/players",
+            f"{BASE_URL}/v4/leagues/{league_id}/market",
+        ]
+        for url in urls:
+            resp = self.session.get(url, timeout=15)
+            if resp.status_code == 200:
+                data = resp.json()
+                players = data.get("players") or data.get("items") or data.get("p") or []
+                if players:
+                    return players
         
         # Fallback v2/v3
         resp2 = self.session.get(f"{BASE_URL}/leagues/{league_id}/market", timeout=30)
         if resp2.status_code == 200:
             return resp2.json().get("players") or []
             
+        return []
+
+    def get_player_details_bulk(self, player_ids: list[str]) -> list[dict]:
+        """Versucht Meta-Daten für eine Liste von Player-IDs zu holen."""
+        if not player_ids:
+            return []
+        # v4 Bulk Details (Vermutung)
+        ids_str = ",".join(player_ids[:50]) # Max 50
+        resp = self.session.get(f"{BASE_URL}/v4/players?ids={ids_str}", timeout=15)
+        if resp.status_code == 200:
+            return resp.json().get("players") or resp.json().get("items") or []
         return []
 
     def get_squad(self, league_id: str, manager_user_id: str) -> list[dict]:
@@ -313,14 +332,27 @@ def main():
 
         cleaned_standings = [_clean_manager(m, i + 1) for i, m in enumerate(raw_standings)]
 
-        if cleaned_standings:
+        if raw_standings:
             first_m = raw_standings[0]
-            log.info("Manager-Objekt Full (Debugging): %s", json.dumps(first_m, indent=2))
-
-        # 4a. Alle Spieler der Liga holen für Metadata-Mapping (optional)
+            # log.info("Manager-Objekt Full (Debugging): %s", json.dumps(first_m, indent=2))
+            
+        # 4a. Alle Spieler der Liga holen für Metadata-Mapping
         all_players_raw = kb.get_all_players(league_id)
         player_map = {str(p.get("i") or p.get("id")): _clean_player(p) for p in all_players_raw}
-        log.info("   Spieler-Pool geladen: %d Spieler bekannt", len(player_map))
+        
+        # Falls Pool leer, versuchen wir Bulk-Details für die ersten 50 gefundenen IDs
+        if not player_map:
+            all_ids = set()
+            for m in raw_standings:
+                all_ids.update([str(pid) for pid in m.get("lp", [])])
+            if all_ids:
+                log.info("   Pool leer, versuche Details für %d IDs zu laden...", len(all_ids))
+                bulk_data = kb.get_player_details_bulk(list(all_ids))
+                for b_player in bulk_data:
+                    p_clean = _clean_player(b_player)
+                    player_map[p_clean["id"]] = p_clean
+
+        log.info("   Spieler-Metadaten geladen: %d Spieler bekannt", len(player_map))
 
         # Kader pro Manager
         squads = {}
