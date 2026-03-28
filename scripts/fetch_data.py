@@ -49,7 +49,7 @@ class KickbaseClient:
         self.session = requests.Session()
         self.session.headers.update(HEADERS)
         self.token = None
-        self.user_id = None
+        self.user_id = ""
 
     def login(self, email: str, password: str) -> None:
         """Authentifizierung gegen die Kickbase API v4."""
@@ -62,29 +62,43 @@ class KickbaseClient:
             sys.exit(1)
 
         data = resp.json()
-        # Token kann in verschiedenen Feldern liegen je nach API-Version
+        # Log keys for debugging (safe)
+        log.info("Login-Antwort Keys: %s", list(data.keys()))
+        
         self.token = data.get("tkn") or data.get("token") or data.get("accessToken")
-        self.user_id = str(data.get("user", {}).get("id", ""))
+        
+        # User ID extraction
+        user_obj = data.get("user") or data.get("u") or {}
+        if isinstance(user_obj, dict):
+            self.user_id = str(user_obj.get("id") or user_obj.get("i") or "")
+        else:
+            self.user_id = str(user_obj)
 
         if not self.token:
-            log.error("Kein Token in der Antwort gefunden. Antwort: %s", data)
+            log.error("Kein Token in der Antwort gefunden. Antwort-Struktur: %s", list(data.keys()))
             sys.exit(1)
 
         self.session.headers["Authorization"] = f"Bearer {self.token}"
-        log.info("Login erfolgreich. User-ID: %s", self.user_id)
+        log.info("Login erfolgreich. User-ID: '%s'", self.user_id)
 
     def get_leagues(self) -> list[dict]:
         """Gibt alle Ligen zurück, in denen der User Mitglied ist."""
+        # v4 leagues
         resp = self.session.get(f"{BASE_URL}/v4/leagues", timeout=30)
-        resp.raise_for_status()
-        data = resp.json()
-        leagues = data.get("leagues") or data.get("items") or []
-
+        log.info("GET /v4/leagues Status: %s", resp.status_code)
+        
+        leagues = []
+        if resp.status_code == 200:
+            data = resp.json()
+            log.info("Leagues-Antwort Keys: %s", list(data.keys()))
+            leagues = data.get("leagues") or data.get("items") or data.get("l") or []
+        
         if not leagues:
-            # Fallback: ältere Endpunktvariante
-            resp2 = self.session.get(f"{BASE_URL}/user/{self.user_id}/leagues", timeout=30)
+            # Fallback v2/v3
+            log.info("Keine Ligen in v4 gefunden, versuche v2 Fallback...")
+            resp2 = self.session.get(f"{BASE_URL}/user/leagues", timeout=30)
             if resp2.status_code == 200:
-                leagues = resp2.json().get("leagues", [])
+                leagues = resp2.json().get("leagues") or []
 
         log.info("Gefundene Ligen: %d", len(leagues))
         return leagues
