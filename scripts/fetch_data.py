@@ -190,10 +190,10 @@ POSITION_MAP = {1: "TW", 2: "ABW", 3: "MF", 4: "STU"}
 
 def _clean_player(raw: dict) -> dict:
     """Normalisiert einen Spieler-Datensatz auf die Felder, die wir brauchen."""
-    # v4 nutzt pi oder i für ID, n oder ln für Name
+    # v4 nutzt pi oder i für ID, pn oder n oder ln für Name
     p_id = str(raw.get("pi") or raw.get("i") or raw.get("id", ""))
     first_name = raw.get("fn") or raw.get("firstName") or ""
-    last_name = raw.get("n") or raw.get("ln") or raw.get("lastName") or raw.get("name") or "Unbekannt"
+    last_name = raw.get("pn") or raw.get("n") or raw.get("ln") or raw.get("lastName") or raw.get("name") or "Unbekannt"
     
     # Team-Name extraktion (tn oder aus team Objekt)
     t_name = raw.get("tn") or raw.get("teamName") or ""
@@ -337,7 +337,8 @@ def main():
 
         # 4b. Metadata-Mapping (Pool laden)
         all_players_raw = kb.get_all_players(league_id)
-        player_map = {str(p.get("i") or p.get("id")): _clean_player(p) for p in all_players_raw}
+        # v4 nutzt 'pi' oder 'i' für ID
+        player_map = {str(p.get("pi") or p.get("i") or p.get("id")): _clean_player(p) for p in all_players_raw}
         log.info("   Spieler-Metadaten geladen: %d Spieler bekannt", len(player_map))
 
         # 4c. Kader pro Manager (Volle Kader inkl. Bank laden)
