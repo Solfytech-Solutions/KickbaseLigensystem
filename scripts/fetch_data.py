@@ -207,7 +207,7 @@ def _clean_player(raw: dict) -> dict:
         "teamName": t_name,
         "position": POSITION_MAP.get(raw.get("pos") or raw.get("position"), "?"),
         "marketValue": raw.get("mv") or raw.get("marketValue") or 0,
-        "totalPoints": raw.get("tp") or raw.get("totalPoints") or raw.get("points") or 0,
+        "totalPoints": raw.get("p") or raw.get("tp") or raw.get("totalPoints") or raw.get("points") or 0,
         "status": raw.get("s") or raw.get("status", 0),
     }
 
