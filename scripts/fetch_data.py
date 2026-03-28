@@ -130,15 +130,15 @@ class KickbaseClient:
 
     def get_squad(self, league_id: str, manager_user_id: str) -> list[dict]:
         """Kader eines Managers in einer bestimmten Liga."""
-        # v4: Versuch 1 (Häufigster v4 Endpunkt)
+        # v4: Versuch 1 (Standard-Weg für Spieler eines Users in einer Liga)
         resp = self.session.get(
-            f"{BASE_URL}/v4/leagues/{league_id}/users/{manager_user_id}/players",
+            f"{BASE_URL}/leagues/{league_id}/users/{manager_user_id}/players",
             timeout=30,
         )
-        # v4: Versuch 2 (Anderer v4 Variant)
+        # v4: Versuch 2 (v4-style)
         if resp.status_code != 200:
             resp = self.session.get(
-                f"{BASE_URL}/v4/leagues/{league_id}/lineups/{manager_user_id}",
+                f"{BASE_URL}/v4/leagues/{league_id}/users/{manager_user_id}/players",
                 timeout=30,
             )
             
@@ -147,14 +147,6 @@ class KickbaseClient:
             # In v4 können Spieler unter 'players', 'p' oder 'pl' liegen
             players = data.get("players") or data.get("items") or data.get("p") or data.get("pl") or []
             return players
-
-        # Fallback v2/v3
-        resp2 = self.session.get(
-            f"{BASE_URL}/leagues/{league_id}/users/{manager_user_id}/players",
-            timeout=30,
-        )
-        if resp2.status_code == 200:
-            return resp2.json().get("players") or []
 
         log.warning(
             "Kader für Manager %s in Liga %s nicht abrufbar: %s",
@@ -302,6 +294,9 @@ def main():
             continue
 
         cleaned_standings = [_clean_manager(m, i + 1) for i, m in enumerate(raw_standings)]
+
+        if cleaned_standings:
+            log.info("Manager-Antwort Keys (Beispiel): %s", list(raw_standings[0].keys()))
 
         # Kader pro Manager
         squads = {}
