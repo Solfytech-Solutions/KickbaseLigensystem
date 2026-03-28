@@ -80,6 +80,8 @@ class KickbaseClient:
 
         self.session.headers["Authorization"] = f"Bearer {self.token}"
         log.info("Login erfolgreich. User-ID: '%s'", self.user_id)
+        if data.get("srvl"):
+            log.info("Server-Liste (srvl): %s", data.get("srvl"))
 
     def get_leagues(self) -> list[dict]:
         """Gibt alle Ligen zurück, in denen der User Mitglied ist."""
@@ -142,14 +144,22 @@ class KickbaseClient:
         if not player_ids:
             return []
         
+        # Teste verschiedene v4-Strukturen für Details
+        test_id = player_ids[0]
+        test_urls = [
+            f"{BASE_URL}/v4/players/{test_id}",
+            f"{BASE_URL}/v4/players/{test_id}/info",
+            f"{BASE_URL}/v4/info/{test_id}",
+            f"{BASE_URL}/v4/p/{test_id}",
+        ]
         results = []
-        # Da Bulk oft 404 liefert, probieren wir es für die ersten 5-10 Spieler einzeln
-        # um zu sehen, ob der Endpoint überhaupt existiert.
-        for pid in player_ids[:15]:
+        for url in test_urls:
             try:
-                resp = self.session.get(f"{BASE_URL}/v4/players/{pid}", timeout=5)
+                resp = self.session.get(url, timeout=5)
                 if resp.status_code == 200:
+                    log.info("   ✓ Erfolg mit Endpoint: %s", url)
                     results.append(resp.json())
+                    break
             except:
                 pass
         return results
