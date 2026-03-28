@@ -112,9 +112,12 @@ class KickbaseClient:
         """Tabellenstände einer Liga (Punkte, Rang, Manager-Name, etc.)."""
         # v4 Endpunkt
         resp = self.session.get(f"{BASE_URL}/v4/leagues/{league_id}/ranking", timeout=30)
+        log.info("GET /v4/leagues/%s/ranking Status: %s", league_id, resp.status_code)
+        
         if resp.status_code == 200:
             data = resp.json()
-            return data.get("users") or data.get("ranking") or data.get("items") or []
+            log.info("Ranking-Antwort Keys: %s", list(data.keys()))
+            return data.get("users") or data.get("ranking") or data.get("items") or data.get("u") or data.get("r") or []
 
         # Fallback auf älteren Endpunkt
         resp2 = self.session.get(f"{BASE_URL}/leagues/{league_id}/users", timeout=30)
@@ -132,7 +135,7 @@ class KickbaseClient:
         )
         if resp.status_code == 200:
             data = resp.json()
-            players = data.get("players") or data.get("items") or []
+            players = data.get("players") or data.get("items") or data.get("p") or data.get("pl") or []
             return players
 
         # Fallback
