@@ -130,12 +130,12 @@ class KickbaseClient:
 
     def get_squad(self, league_id: str, manager_user_id: str) -> list[dict]:
         """Kader eines Managers in einer bestimmten Liga."""
-        # v4: Versuch 1 (Standard-Weg für Spieler eines Users in einer Liga)
+        # v4: Versuch 1 (Singular 'lineup' ist oft korrekt in v4)
         resp = self.session.get(
-            f"{BASE_URL}/leagues/{league_id}/users/{manager_user_id}/players",
+            f"{BASE_URL}/v4/leagues/{league_id}/lineup/{manager_user_id}",
             timeout=30,
         )
-        # v4: Versuch 2 (v4-style)
+        # v4: Versuch 2 (User-basiert)
         if resp.status_code != 200:
             resp = self.session.get(
                 f"{BASE_URL}/v4/leagues/{league_id}/users/{manager_user_id}/players",
@@ -144,12 +144,19 @@ class KickbaseClient:
             
         if resp.status_code == 200:
             data = resp.json()
-            # In v4 können Spieler unter 'players', 'p' oder 'pl' liegen
-            players = data.get("players") or data.get("items") or data.get("p") or data.get("pl") or []
+            # In v4 können Spieler unter 'players', 'p', 'pl' oder direkt im Root liegen
+            players = data.get("players") or data.get("items") or data.get("p") or data.get("pl") or data.get("lineup") or []
+            if not players and isinstance(data, list):
+                players = data
             return players
 
+        # Letzter Fallback v2/v3
+        resp_fb = self.session.get(f"{BASE_URL}/leagues/{league_id}/users/{manager_user_id}/players", timeout=30)
+        if resp_fb.status_code == 200:
+            return resp_fb.json().get("players") or []
+
         log.warning(
-            "Kader für Manager %s in Liga %s nicht abrufbar: %s",
+            "Kader für Manager %s in Liga %s nicht abrufbar (v4 Status: %s)",
             manager_user_id, league_id, resp.status_code,
         )
         return []
@@ -184,7 +191,7 @@ def _clean_manager(raw: dict, rank: int) -> dict:
         "userId": str(user_data.get("i") or user_data.get("userId") or raw.get("id", "")),
         "name": user_data.get("n") or user_data.get("name") or user_data.get("userName") or "Unbekannt",
         "profileUrl": user_data.get("pu") or user_data.get("profileUrl", ""),
-        "points": raw.get("pt") or raw.get("points") or raw.get("totalPoints") or 0,
+        "points": raw.get("sp") or raw.get("pt") or raw.get("points") or raw.get("totalPoints") or 0,
         "teamValue": raw.get("tv") or raw.get("teamValue") or 0,
         "budget": raw.get("b") or raw.get("budget") or 0,
         "squadSize": raw.get("sq") or raw.get("squadSize") or 0,
