@@ -140,29 +140,23 @@ class KickbaseClient:
         return []
 
     def get_player_details_bulk(self, player_ids: list[str]) -> list[dict]:
-        """Versucht Meta-Daten für eine Liste von Player-IDs zu holen."""
+        """Versucht Meta-Daten für eine Liste von Player-IDs via POST zu holen."""
         if not player_ids:
             return []
         
-        # Teste verschiedene v4-Strukturen für Details
-        test_id = player_ids[0]
-        test_urls = [
-            f"{BASE_URL}/v4/players/{test_id}",
-            f"{BASE_URL}/v4/players/{test_id}/info",
-            f"{BASE_URL}/v4/info/{test_id}",
-            f"{BASE_URL}/v4/p/{test_id}",
-        ]
-        results = []
-        for url in test_urls:
-            try:
-                resp = self.session.get(url, timeout=5)
-                if resp.status_code == 200:
-                    log.info("   ✓ Erfolg mit Endpoint: %s", url)
-                    results.append(resp.json())
-                    break
-            except:
-                pass
-        return results
+        # v4 Bulk Details via POST (oft verwendet für IDs)
+        payload = {"ids": player_ids[:50]}
+        url = f"{BASE_URL}/v4/players/info"
+        try:
+            resp = self.session.post(url, json=payload, timeout=15)
+            if resp.status_code == 200:
+                log.info("   ✓ Erfolg mit POST %s", url)
+                data = resp.json()
+                return data.get("players") or data.get("items") or data.get("p") or []
+        except Exception as e:
+            log.debug("Fehler bei POST %s: %s", url, e)
+            
+        return []
 
     def get_squad(self, league_id: str, manager_user_id: str) -> list[dict]:
         """Kader eines Managers in einer bestimmten Liga."""
