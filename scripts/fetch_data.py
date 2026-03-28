@@ -199,6 +199,13 @@ def _clean_player(raw: dict) -> dict:
     t_name = raw.get("tn") or raw.get("teamName") or ""
     if not t_name and isinstance(raw.get("team"), dict):
         t_name = raw.get("team", {}).get("name", "")
+    
+    # Gesamtpunkte v4 nutzt meist 'p', v3 'points', v2 'totalPoints'
+    pts = raw.get("p")
+    if pts is None: pts = raw.get("tp")
+    if pts is None: pts = raw.get("points")
+    if pts is None: pts = raw.get("totalPoints")
+    if pts is None: pts = 0
 
     return {
         "id": p_id,
@@ -207,7 +214,7 @@ def _clean_player(raw: dict) -> dict:
         "teamName": t_name,
         "position": POSITION_MAP.get(raw.get("pos") or raw.get("position"), "?"),
         "marketValue": raw.get("mv") or raw.get("marketValue") or 0,
-        "totalPoints": raw.get("p") or raw.get("tp") or raw.get("totalPoints") or raw.get("points") or 0,
+        "totalPoints": int(pts),
         "status": raw.get("s") or raw.get("status", 0),
     }
 
