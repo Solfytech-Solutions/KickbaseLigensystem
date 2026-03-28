@@ -158,28 +158,31 @@ POSITION_MAP = {1: "TW", 2: "ABW", 3: "MF", 4: "STU"}
 def _clean_player(raw: dict) -> dict:
     """Normalisiert einen Spieler-Datensatz auf die Felder, die wir brauchen."""
     return {
-        "id": str(raw.get("id", "")),
-        "firstName": raw.get("firstName") or raw.get("fn") or "",
-        "lastName": raw.get("lastName") or raw.get("ln") or raw.get("name") or "",
-        "teamName": raw.get("teamName") or raw.get("team", {}).get("name") if isinstance(raw.get("team"), dict) else raw.get("teamName", ""),
-        "position": POSITION_MAP.get(raw.get("position") or raw.get("pos"), "?"),
-        "marketValue": raw.get("marketValue") or raw.get("mv") or 0,
-        "totalPoints": raw.get("totalPoints") or raw.get("tp") or raw.get("points") or 0,
-        "status": raw.get("status", 0),  # 0=fit, 1=verletzt, etc.
+        "id": str(raw.get("i") or raw.get("id", "")),
+        "firstName": raw.get("fn") or raw.get("firstName") or "",
+        "lastName": raw.get("ln") or raw.get("lastName") or raw.get("name") or "",
+        "teamName": raw.get("tn") or raw.get("teamName") or raw.get("team", {}).get("name") if isinstance(raw.get("team"), dict) else raw.get("teamName", ""),
+        "position": POSITION_MAP.get(raw.get("pos") or raw.get("position"), "?"),
+        "marketValue": raw.get("mv") or raw.get("marketValue") or 0,
+        "totalPoints": raw.get("tp") or raw.get("totalPoints") or raw.get("points") or 0,
+        "status": raw.get("s") or raw.get("status", 0),
     }
 
 
 def _clean_manager(raw: dict, rank: int) -> dict:
     """Normalisiert einen Manager-/Standings-Eintrag."""
+    # User-Objekt kann direkt in raw oder unter 'u' liegen
+    user_data = raw.get("u") if isinstance(raw.get("u"), dict) else raw
+    
     return {
         "rank": rank,
-        "userId": str(raw.get("userId") or raw.get("user", {}).get("id") if isinstance(raw.get("user"), dict) else raw.get("id", "")),
-        "name": raw.get("name") or raw.get("userName") or raw.get("user", {}).get("name") if isinstance(raw.get("user"), dict) else raw.get("name", "Unbekannt"),
-        "profileUrl": raw.get("profileUrl") or raw.get("user", {}).get("profileUrl", "") if isinstance(raw.get("user"), dict) else "",
-        "points": raw.get("points") or raw.get("totalPoints") or raw.get("tp") or 0,
-        "teamValue": raw.get("teamValue") or raw.get("tv") or 0,
-        "budget": raw.get("budget") or raw.get("b") or 0,
-        "squadSize": raw.get("squadSize") or raw.get("ps") or 0,
+        "userId": str(user_data.get("i") or user_data.get("userId") or raw.get("id", "")),
+        "name": user_data.get("n") or user_data.get("name") or user_data.get("userName") or "Unbekannt",
+        "profileUrl": user_data.get("pu") or user_data.get("profileUrl", ""),
+        "points": raw.get("pt") or raw.get("points") or raw.get("totalPoints") or 0,
+        "teamValue": raw.get("tv") or raw.get("teamValue") or 0,
+        "budget": raw.get("b") or raw.get("budget") or 0,
+        "squadSize": raw.get("sq") or raw.get("squadSize") or 0,
     }
 
 
@@ -266,9 +269,14 @@ def main():
 
     # 4. Für jede Liga: Standings + Kader holen und in Firestore schreiben
     for league in leagues:
-        league_id = str(league.get("id", ""))
-        league_name = league.get("name", league_id)
+        # v4 nutzt oft extrem kurze Keys: i=id, n=name
+        league_id = str(league.get("i") or league.get("id") or "")
+        league_name = league.get("n") or league.get("name") or league_id
         log.info("── Verarbeite Liga: '%s' (%s) ──", league_name, league_id)
+
+        if not league_id:
+            log.warning("Liga-Objekt hat keine ID: %s", league)
+            continue
 
         # Standings
         raw_standings = kb.get_standings(league_id)
