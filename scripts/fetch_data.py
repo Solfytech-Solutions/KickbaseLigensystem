@@ -1,0 +1,279 @@
+#!/usr/bin/env python3
+"""
+Kickbase Liga Datenfetcher
+Holt Tabellenstände und Manager-Kader von allen Kickbase-Ligen des Accounts
+und schreibt die Daten in Firebase Firestore.
+"""
+
+import os
+import json
+import sys
+import logging
+from datetime import datetime, timezone
+
+import requests
+from dotenv import load_dotenv
+import firebase_admin
+from firebase_admin import credentials, firestore
+
+# ─── Logging ────────────────────────────────────────────────────────────────
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[logging.StreamHandler(sys.stdout)],
+)
+log = logging.getLogger(__name__)
+
+# ─── Umgebungsvariablen laden ────────────────────────────────────────────────
+load_dotenv()
+
+KICKBASE_EMAIL = os.environ["KICKBASE_EMAIL"]
+KICKBASE_PASSWORD = os.environ["KICKBASE_PASSWORD"]
+FIREBASE_SERVICE_ACCOUNT_JSON = os.environ["FIREBASE_SERVICE_ACCOUNT_JSON"]
+
+# Optional: Kommagetrennte Liga-IDs filtern (leer = alle Ligen)
+_league_ids_env = os.environ.get("KICKBASE_LEAGUE_IDS", "").strip()
+FILTER_LEAGUE_IDS = [x.strip() for x in _league_ids_env.split(",") if x.strip()]
+
+# ─── Kickbase API ────────────────────────────────────────────────────────────
+BASE_URL = "https://api.kickbase.com"
+HEADERS = {
+    "Content-Type": "application/json",
+    "Accept": "application/json",
+    "User-Agent": "Kickbase/ios",
+}
+
+
+class KickbaseClient:
+    def __init__(self):
+        self.session = requests.Session()
+        self.session.headers.update(HEADERS)
+        self.token = None
+        self.user_id = None
+
+    def login(self, email: str, password: str) -> None:
+        """Authentifizierung gegen die Kickbase API v4."""
+        payload = {"em": email, "pass": password, "loy": False, "rep": {}}
+        log.info("Logge mich bei Kickbase ein ...")
+        resp = self.session.post(f"{BASE_URL}/v4/user/login", json=payload, timeout=30)
+
+        if resp.status_code != 200:
+            log.error("Login fehlgeschlagen: %s – %s", resp.status_code, resp.text)
+            sys.exit(1)
+
+        data = resp.json()
+        # Token kann in verschiedenen Feldern liegen je nach API-Version
+        self.token = data.get("tkn") or data.get("token") or data.get("accessToken")
+        self.user_id = str(data.get("user", {}).get("id", ""))
+
+        if not self.token:
+            log.error("Kein Token in der Antwort gefunden. Antwort: %s", data)
+            sys.exit(1)
+
+        self.session.headers["Authorization"] = f"Bearer {self.token}"
+        log.info("Login erfolgreich. User-ID: %s", self.user_id)
+
+    def get_leagues(self) -> list[dict]:
+        """Gibt alle Ligen zurück, in denen der User Mitglied ist."""
+        resp = self.session.get(f"{BASE_URL}/v4/leagues", timeout=30)
+        resp.raise_for_status()
+        data = resp.json()
+        leagues = data.get("leagues") or data.get("items") or []
+
+        if not leagues:
+            # Fallback: ältere Endpunktvariante
+            resp2 = self.session.get(f"{BASE_URL}/user/{self.user_id}/leagues", timeout=30)
+            if resp2.status_code == 200:
+                leagues = resp2.json().get("leagues", [])
+
+        log.info("Gefundene Ligen: %d", len(leagues))
+        return leagues
+
+    def get_standings(self, league_id: str) -> list[dict]:
+        """Tabellenstände einer Liga (Punkte, Rang, Manager-Name, etc.)."""
+        # v4 Endpunkt
+        resp = self.session.get(f"{BASE_URL}/v4/leagues/{league_id}/ranking", timeout=30)
+        if resp.status_code == 200:
+            data = resp.json()
+            return data.get("users") or data.get("ranking") or data.get("items") or []
+
+        # Fallback auf älteren Endpunkt
+        resp2 = self.session.get(f"{BASE_URL}/leagues/{league_id}/users", timeout=30)
+        if resp2.status_code == 200:
+            return resp2.json().get("users", [])
+
+        log.warning("Standings für Liga %s nicht abrufbar: %s", league_id, resp.status_code)
+        return []
+
+    def get_squad(self, league_id: str, manager_user_id: str) -> list[dict]:
+        """Kader eines Managers in einer bestimmten Liga."""
+        resp = self.session.get(
+            f"{BASE_URL}/v4/leagues/{league_id}/lineups/{manager_user_id}",
+            timeout=30,
+        )
+        if resp.status_code == 200:
+            data = resp.json()
+            players = data.get("players") or data.get("items") or []
+            return players
+
+        # Fallback
+        resp2 = self.session.get(
+            f"{BASE_URL}/leagues/{league_id}/users/{manager_user_id}/players",
+            timeout=30,
+        )
+        if resp2.status_code == 200:
+            return resp2.json().get("players", [])
+
+        log.warning(
+            "Kader für Manager %s in Liga %s nicht abrufbar: %s",
+            manager_user_id, league_id, resp.status_code,
+        )
+        return []
+
+
+# ─── Hilfsfunktionen ─────────────────────────────────────────────────────────
+
+POSITION_MAP = {1: "TW", 2: "ABW", 3: "MF", 4: "STU"}
+
+
+def _clean_player(raw: dict) -> dict:
+    """Normalisiert einen Spieler-Datensatz auf die Felder, die wir brauchen."""
+    return {
+        "id": str(raw.get("id", "")),
+        "firstName": raw.get("firstName") or raw.get("fn") or "",
+        "lastName": raw.get("lastName") or raw.get("ln") or raw.get("name") or "",
+        "teamName": raw.get("teamName") or raw.get("team", {}).get("name") if isinstance(raw.get("team"), dict) else raw.get("teamName", ""),
+        "position": POSITION_MAP.get(raw.get("position") or raw.get("pos"), "?"),
+        "marketValue": raw.get("marketValue") or raw.get("mv") or 0,
+        "totalPoints": raw.get("totalPoints") or raw.get("tp") or raw.get("points") or 0,
+        "status": raw.get("status", 0),  # 0=fit, 1=verletzt, etc.
+    }
+
+
+def _clean_manager(raw: dict, rank: int) -> dict:
+    """Normalisiert einen Manager-/Standings-Eintrag."""
+    return {
+        "rank": rank,
+        "userId": str(raw.get("userId") or raw.get("user", {}).get("id") if isinstance(raw.get("user"), dict) else raw.get("id", "")),
+        "name": raw.get("name") or raw.get("userName") or raw.get("user", {}).get("name") if isinstance(raw.get("user"), dict) else raw.get("name", "Unbekannt"),
+        "profileUrl": raw.get("profileUrl") or raw.get("user", {}).get("profileUrl", "") if isinstance(raw.get("user"), dict) else "",
+        "points": raw.get("points") or raw.get("totalPoints") or raw.get("tp") or 0,
+        "teamValue": raw.get("teamValue") or raw.get("tv") or 0,
+        "budget": raw.get("budget") or raw.get("b") or 0,
+        "squadSize": raw.get("squadSize") or raw.get("ps") or 0,
+    }
+
+
+# ─── Firestore ───────────────────────────────────────────────────────────────
+
+def init_firestore():
+    """Firebase-Admin initialisieren. Gibt den Firestore-Client zurück."""
+    service_account_info = json.loads(FIREBASE_SERVICE_ACCOUNT_JSON)
+    cred = credentials.Certificate(service_account_info)
+    firebase_admin.initialize_app(cred)
+    return firestore.client()
+
+
+def write_league_to_firestore(db, league: dict, standings: list, squads: dict):
+    """Schreibt alle Daten einer Liga in Firestore."""
+    league_id = str(league.get("id", ""))
+    league_name = league.get("name", f"Liga {league_id}")
+
+    log.info("Schreibe Liga '%s' (%s) in Firestore ...", league_name, league_id)
+
+    now = datetime.now(timezone.utc)
+
+    # Liga-Metadaten & Tabelle
+    league_ref = db.collection("leagues").document(league_id)
+    league_ref.set(
+        {
+            "id": league_id,
+            "name": league_name,
+            "imageUrl": league.get("imageUrl") or league.get("leagueImage", ""),
+            "standings": standings,
+            "lastUpdated": now,
+        }
+    )
+    log.info("  ✓ Liga-Dokument + %d Standings gespeichert", len(standings))
+
+    # Kader pro Manager
+    batch = db.batch()
+    squad_count = 0
+    for manager_data in standings:
+        uid = manager_data.get("userId", "")
+        if not uid:
+            continue
+        squad = squads.get(uid, [])
+        squad_ref = league_ref.collection("squads").document(uid)
+        batch.set(
+            squad_ref,
+            {
+                "userId": uid,
+                "managerName": manager_data.get("name", ""),
+                "players": squad,
+                "lastUpdated": now,
+            },
+        )
+        squad_count += 1
+
+    batch.commit()
+    log.info("  ✓ %d Manager-Kader gespeichert", squad_count)
+
+
+# ─── Main ─────────────────────────────────────────────────────────────────────
+
+def main():
+    log.info("═══ Kickbase Datenfetcher gestartet ═══")
+
+    # 1. Firebase initialisieren
+    db = init_firestore()
+
+    # 2. Kickbase Login
+    kb = KickbaseClient()
+    kb.login(KICKBASE_EMAIL, KICKBASE_PASSWORD)
+
+    # 3. Ligen abrufen
+    all_leagues = kb.get_leagues()
+
+    if FILTER_LEAGUE_IDS:
+        leagues = [lg for lg in all_leagues if str(lg.get("id")) in FILTER_LEAGUE_IDS]
+        log.info("Gefiltertete Ligen: %d von %d", len(leagues), len(all_leagues))
+    else:
+        leagues = all_leagues
+
+    if not leagues:
+        log.error("Keine Ligen gefunden! Bitte KICKBASE_LEAGUE_IDS prüfen.")
+        sys.exit(1)
+
+    # 4. Für jede Liga: Standings + Kader holen und in Firestore schreiben
+    for league in leagues:
+        league_id = str(league.get("id", ""))
+        league_name = league.get("name", league_id)
+        log.info("── Verarbeite Liga: '%s' (%s) ──", league_name, league_id)
+
+        # Standings
+        raw_standings = kb.get_standings(league_id)
+        if not raw_standings:
+            log.warning("Keine Standings für Liga %s", league_id)
+            continue
+
+        cleaned_standings = [_clean_manager(m, i + 1) for i, m in enumerate(raw_standings)]
+
+        # Kader pro Manager
+        squads = {}
+        for manager in cleaned_standings:
+            uid = manager.get("userId", "")
+            if not uid:
+                continue
+            raw_squad = kb.get_squad(league_id, uid)
+            squads[uid] = [_clean_player(p) for p in raw_squad]
+            log.info("   Kader von %s: %d Spieler", manager["name"], len(squads[uid]))
+
+        # In Firestore schreiben
+        write_league_to_firestore(db, league, cleaned_standings, squads)
+
+    log.info("═══ Fertig! Alle Daten gespeichert. ═══")
+
+
+if __name__ == "__main__":
+    main()

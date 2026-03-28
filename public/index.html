@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kickbase Ligen Dashboard</title>
+  <meta name="description" content="Live Tabellenstände und Manager-Kader deiner Kickbase Ligen" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- ── Header ── -->
+  <header class="app-header">
+    <div class="header-inner">
+      <div class="logo">
+        <span class="logo-icon">⚽</span>
+        <span class="logo-text">Kickbase <strong>Ligen</strong></span>
+      </div>
+      <div class="last-updated" id="lastUpdated">Lade Daten …</div>
+    </div>
+  </header>
+
+  <!-- ── Liga Tabs ── -->
+  <div class="tabs-container">
+    <div class="tabs" id="ligaTabs">
+      <!-- Dynamisch befüllt -->
+    </div>
+  </div>
+
+  <!-- ── Hauptinhalt ── -->
+  <main class="main-content">
+    <div id="loadingState" class="loading-state">
+      <div class="spinner"></div>
+      <p>Verbinde mit Firebase …</p>
+    </div>
+    <div id="errorState" class="error-state hidden">
+      <span class="error-icon">⚠️</span>
+      <p id="errorMessage">Ein Fehler ist aufgetreten.</p>
+    </div>
+    <div id="leagueContent" class="hidden">
+      <!-- Tabelle -->
+      <section class="standings-section">
+        <h2 class="section-title">🏆 Tabelle</h2>
+        <div class="standings-table-wrapper">
+          <table class="standings-table" id="standingsTable">
+            <thead>
+              <tr>
+                <th class="col-rank">#</th>
+                <th class="col-name">Manager</th>
+                <th class="col-points">Punkte</th>
+                <th class="col-value">Teamwert</th>
+                <th class="col-squad">Kader</th>
+              </tr>
+            </thead>
+            <tbody id="standingsBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Kader-Bereich -->
+      <section class="squads-section">
+        <h2 class="section-title">👤 Manager-Kader</h2>
+        <div class="squads-grid" id="squadsGrid"></div>
+      </section>
+    </div>
+  </main>
+
+  <!-- ── Squad-Modal ── -->
+  <div id="squadModal" class="modal-overlay hidden" role="dialog" aria-modal="true">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="modalTitle">Kader</h3>
+        <button class="modal-close" id="modalClose" aria-label="Schließen">✕</button>
+      </div>
+      <div class="modal-body" id="modalBody"></div>
+    </div>
+  </div>
+
+  <!-- ── Firebase SDK (CDN, compat mode) ── -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
