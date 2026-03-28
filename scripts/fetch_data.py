@@ -118,43 +118,22 @@ class KickbaseClient:
         return {}
 
     def get_all_players(self, league_id: str) -> list[dict]:
-        """Holt den gesamten Spielerpool der Liga (für Meta-Daten Suche)."""
-        # Versuch v4 Pool Varianten
-        urls = [
-            f"{BASE_URL}/v4/leagues/{league_id}/players",
-            f"{BASE_URL}/v4/leagues/{league_id}/market",
-        ]
-        for url in urls:
-            resp = self.session.get(url, timeout=15)
+        """Holt den gesamten Spielerpool der Bundesliga (v4 Competitions)."""
+        # Bundesliga Competition ID ist 1
+        url = f"{BASE_URL}/v4/competitions/1/players"
+        try:
+            resp = self.session.get(url, timeout=30)
             if resp.status_code == 200:
                 data = resp.json()
-                players = data.get("players") or data.get("items") or data.get("p") or []
-                if players:
-                    return players
+                # v4 Competition Players liegen oft in 'it' (Items)
+                return data.get("it") or data.get("items") or []
+        except Exception as e:
+            log.warning("Fehler beim Laden des globalen Spielerpools: %s", e)
         
         # Fallback v2/v3
         resp2 = self.session.get(f"{BASE_URL}/leagues/{league_id}/market", timeout=30)
         if resp2.status_code == 200:
             return resp2.json().get("players") or []
-            
-        return []
-
-    def get_player_details_bulk(self, player_ids: list[str]) -> list[dict]:
-        """Versucht Meta-Daten für eine Liste von Player-IDs via POST zu holen."""
-        if not player_ids:
-            return []
-        
-        # v4 Bulk Details via POST (oft verwendet für IDs)
-        payload = {"ids": player_ids[:50]}
-        url = f"{BASE_URL}/v4/players/info"
-        try:
-            resp = self.session.post(url, json=payload, timeout=15)
-            if resp.status_code == 200:
-                log.info("   ✓ Erfolg mit POST %s", url)
-                data = resp.json()
-                return data.get("players") or data.get("items") or data.get("p") or []
-        except Exception as e:
-            log.debug("Fehler bei POST %s: %s", url, e)
             
         return []
 
@@ -194,11 +173,21 @@ POSITION_MAP = {1: "TW", 2: "ABW", 3: "MF", 4: "STU"}
 
 def _clean_player(raw: dict) -> dict:
     """Normalisiert einen Spieler-Datensatz auf die Felder, die wir brauchen."""
+    # v4 nutzt pi oder i für ID, n oder ln für Name
+    p_id = str(raw.get("pi") or raw.get("i") or raw.get("id", ""))
+    first_name = raw.get("fn") or raw.get("firstName") or ""
+    last_name = raw.get("n") or raw.get("ln") or raw.get("lastName") or raw.get("name") or "Unbekannt"
+    
+    # Team-Name extraktion (tn oder aus team Objekt)
+    t_name = raw.get("tn") or raw.get("teamName") or ""
+    if not t_name and isinstance(raw.get("team"), dict):
+        t_name = raw.get("team", {}).get("name", "")
+
     return {
-        "id": str(raw.get("i") or raw.get("id", "")),
-        "firstName": raw.get("fn") or raw.get("firstName") or "",
-        "lastName": raw.get("ln") or raw.get("lastName") or raw.get("name") or "",
-        "teamName": raw.get("tn") or raw.get("teamName") or raw.get("team", {}).get("name") if isinstance(raw.get("team"), dict) else raw.get("teamName", ""),
+        "id": p_id,
+        "firstName": first_name,
+        "lastName": last_name,
+        "teamName": t_name,
         "position": POSITION_MAP.get(raw.get("pos") or raw.get("position"), "?"),
         "marketValue": raw.get("mv") or raw.get("marketValue") or 0,
         "totalPoints": raw.get("tp") or raw.get("totalPoints") or raw.get("points") or 0,
@@ -325,95 +314,44 @@ def main():
             log.warning("Keine Standings für Liga %s", league_id)
             continue
 
-        # Debug: Was steckt in den anderen Keys?
-        for key in ["il", "nd", "ia", "ti", "cpi", "day"]:
-            val = ranking_data.get(key)
-            if isinstance(val, (list, dict)):
-                count = len(val)
-                log.info("   Key '%s' enthält %d Einträge", key, count)
-                if count > 0:
-                    try:
-                        sample = val[0] if isinstance(val, list) else list(val.items())[0]
-                        log.info("   Probe von '%s': %s", key, str(sample)[:200])
-                    except:
-                        pass
-            else:
-                log.info("   Key '%s' ist kein Container: %s", key, type(val))
-
-        # Mapping bauen aus all diesen Quellen
-        meta_map = {}
-        for key in ["il", "ia", "cpi", "ti"]:
-            src = ranking_data.get(key)
-            # Falls Kickbase JSON in Strings versteckt (oft in v4)
-            if isinstance(src, str) and src.strip().startswith(("{", "[")):
-                try:
-                    src = json.loads(src)
-                    log.info("   ✓ Key '%s' erfolgreich als JSON dekodiert", key)
-                except:
-                    pass
-
-            if isinstance(src, list):
-                for item in src:
-                    iid = str(item.get("i") or item.get("id") or "")
-                    if iid:
-                        meta_map[iid] = item
-            elif isinstance(src, dict):
-                for iid, item in src.items():
-                    meta_map[str(iid)] = item
-                    
-        # 'nd' ist oft ein Namen-Wörterbuch { "ID": "Name" }
-        name_dict = ranking_data.get("nd") or {}
-        if isinstance(name_dict, dict):
-            for iid, name in name_dict.items():
-                if str(iid) not in meta_map:
-                    meta_map[str(iid)] = {"i": iid, "n": name}
-
-        # Sortiere nach Punkten (sp) absteigend
+        # 4a. Standings sortieren und säubern
         raw_standings.sort(key=lambda x: x.get("sp") or 0, reverse=True)
         cleaned_standings = [_clean_manager(m, i + 1) for i, m in enumerate(raw_standings)]
 
-        # 4b. Metadata-Mapping vervollständigen
+        # 4b. Metadata-Mapping (Pool laden)
         all_players_raw = kb.get_all_players(league_id)
         player_map = {str(p.get("i") or p.get("id")): _clean_player(p) for p in all_players_raw}
-        
-        # Ergänze aus meta_map (il)
-        for iid, m_data in meta_map.items():
-            if iid not in player_map:
-                player_map[iid] = _clean_player(m_data)
-
         log.info("   Spieler-Metadaten geladen: %d Spieler bekannt", len(player_map))
 
-        # Kader pro Manager
+        # 4c. Kader pro Manager (via 'lp' IDs)
         squads = {}
         for manager in cleaned_standings:
             uid = manager.get("userId", "")
             if not uid:
                 continue
             
-            # Hole Player IDs aus 'lp' (Lineup Players)
+            # Hole Player IDs aus 'lp' (Lineup Players) des Original-Objekts
             manager_raw = next((m for m in raw_standings if str(m.get("i") or m.get("id")) == uid), {})
-            player_ids = manager_raw.get("lp", [])
+            player_ids = manager_raw.get("lp", []) or []
             
-            if not isinstance(player_ids, list):
-                player_ids = []
-
-            # Versuche Kader-Details über Player-Pool zu mappen
             current_squad = []
             for pid in player_ids:
                 pid_str = str(pid)
                 if pid_str in player_map:
                     current_squad.append(player_map[pid_str])
                 else:
-                    # Fallback: Wenigstens die ID speichern
-                    current_squad.append({"id": pid_str, "lastName": f"Spieler {pid_str}", "teamName": "Unbekannt", "position": "?", "marketValue": 0, "totalPoints": 0})
-
-            # Falls 'lp' leer war, versuchen wir den alten API-Weg (Fallback)
-            if not current_squad:
-                raw_squad = kb.get_squad(league_id, uid)
-                current_squad = [_clean_player(p) for p in raw_squad]
-
+                    # Fallback: ID anzeigen, da v4 Metadaten oft nicht via API-Pool kommen
+                    current_squad.append({
+                        "id": pid_str, 
+                        "lastName": f"Spieler {pid_str}", 
+                        "teamName": "Kickbase v4", 
+                        "position": "?", 
+                        "marketValue": 0, 
+                        "totalPoints": 0
+                    })
+            
             squads[uid] = current_squad
-            log.info("   Kader von %s: %d Spieler", manager["name"], len(squads[uid]))
+            log.info("   Kader von %s: %d Spieler", manager["name"], len(current_squad))
 
         # In Firestore schreiben
         write_league_to_firestore(db, league, cleaned_standings, squads)
