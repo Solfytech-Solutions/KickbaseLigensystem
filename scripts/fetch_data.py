@@ -125,8 +125,15 @@ class KickbaseClient:
             resp = self.session.get(url, timeout=30)
             if resp.status_code == 200:
                 data = resp.json()
-                # v4 Competition Players liegen oft in 'it' (Items)
-                return data.get("it") or data.get("items") or []
+                log.info("   Metadaten-Keys gefunden: %s", list(data.keys()))
+                # Find all list fields to see where the players are
+                for k, v in data.items():
+                    if isinstance(v, list):
+                        log.info("   Feld '%s' enthält %d Einträge", k, len(v))
+                        if len(v) > 0:
+                            log.info("   Probe '%s': %s", k, str(v[0])[:150])
+                
+                return data.get("it") or data.get("items") or data.get("players") or []
         except Exception as e:
             log.warning("Fehler beim Laden des globalen Spielerpools: %s", e)
         
