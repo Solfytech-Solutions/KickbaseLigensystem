@@ -132,11 +132,8 @@ class KickbaseClient:
         """Kader eines Managers in einer bestimmten Liga."""
         # Liste möglicher Endpunkte (v4 und Fallbacks)
         endpoints = [
-            f"{BASE_URL}/v4/leagues/{league_id}/lineup?managerId={manager_user_id}", # v4 Query Param
-            f"{BASE_URL}/v4/leagues/{league_id}/players?managerId={manager_user_id}", # v4 Query Param
-            f"{BASE_URL}/v4/leagues/{league_id}/users/{manager_user_id}/players",
-            f"{BASE_URL}/v4/leagues/{league_id}/lineup/{manager_user_id}",
-            f"{BASE_URL}/leagues/{league_id}/users/{manager_user_id}/players",  # v3/v2
+            f"{BASE_URL}/v4/leagues/{league_id}/ranking?managerId={manager_user_id}", # v4 Ranking Detail
+            f"{BASE_URL}/v4/leagues/{league_id}/lineup?managerId={manager_user_id}", # v4 Lineup Query
         ]
         
         for url in endpoints:
@@ -145,15 +142,12 @@ class KickbaseClient:
                 if resp.status_code == 200:
                     data = resp.json()
                     players = []
-                    if isinstance(data, list):
-                        players = data
-                    elif isinstance(data, dict):
-                        # In v4 können Spieler unter verschiedenen Keys liegen
-                        players = data.get("players") or data.get("items") or data.get("p") or data.get("pl") or data.get("lineup") or []
-                        if not players:
-                            u_obj = data.get("u") or data.get("user") or {}
-                            if isinstance(u_obj, dict):
-                                players = u_obj.get("pl") or u_obj.get("players") or u_obj.get("p") or []
+                    # v4: Die Spieler sind oft unter data['u']['pl'] oder data['pl']
+                    if isinstance(data, dict):
+                        # Wenn wir ranking?managerId abrufen, liegt der User oft unter 'u' oder 'user'
+                        u_obj = data.get("u") or data.get("user") or data
+                        if isinstance(u_obj, dict):
+                            players = u_obj.get("pl") or u_obj.get("players") or u_obj.get("lineup") or []
                     
                     if players:
                         return players
@@ -308,10 +302,7 @@ def main():
 
         if cleaned_standings:
             first_m = raw_standings[0]
-            log.info("Manager-Antwort Keys (Beispiel): %s", list(first_m.keys()))
-            log.info("Manager 'sp' vs 'pa' (Beispiel): %s vs %s", first_m.get("sp"), first_m.get("pa"))
-            log.info("Manager 'spl' / 'shpl' / 'hll' (Beispiel): %s / %s / %s", 
-                     first_m.get("spl"), first_m.get("shpl"), first_m.get("hll"))
+            log.info("Manager-Objekt Full (Debugging): %s", json.dumps(first_m, indent=2))
 
         # Kader pro Manager
         squads = {}
