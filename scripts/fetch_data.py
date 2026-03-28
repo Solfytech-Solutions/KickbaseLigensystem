@@ -132,10 +132,11 @@ class KickbaseClient:
         """Kader eines Managers in einer bestimmten Liga."""
         # Liste möglicher Endpunkte (v4 und Fallbacks)
         endpoints = [
-            f"{BASE_URL}/leagues/{league_id}/users/{manager_user_id}/players",  # Klassisch v2/v3
+            f"{BASE_URL}/v4/leagues/{league_id}/lineup?managerId={manager_user_id}", # v4 Query Param
+            f"{BASE_URL}/v4/leagues/{league_id}/players?managerId={manager_user_id}", # v4 Query Param
             f"{BASE_URL}/v4/leagues/{league_id}/users/{manager_user_id}/players",
             f"{BASE_URL}/v4/leagues/{league_id}/lineup/{manager_user_id}",
-            f"{BASE_URL}/v4/leagues/{league_id}/ranking/{manager_user_id}",
+            f"{BASE_URL}/leagues/{league_id}/users/{manager_user_id}/players",  # v3/v2
         ]
         
         for url in endpoints:
@@ -143,13 +144,12 @@ class KickbaseClient:
                 resp = self.session.get(url, timeout=10)
                 if resp.status_code == 200:
                     data = resp.json()
-                    # Verschiedene Keys für Spielerlisten in der API
                     players = []
                     if isinstance(data, list):
                         players = data
                     elif isinstance(data, dict):
+                        # In v4 können Spieler unter verschiedenen Keys liegen
                         players = data.get("players") or data.get("items") or data.get("p") or data.get("pl") or data.get("lineup") or []
-                        # Suche tiefer in User-Objekten
                         if not players:
                             u_obj = data.get("u") or data.get("user") or {}
                             if isinstance(u_obj, dict):
@@ -160,10 +160,6 @@ class KickbaseClient:
             except Exception as e:
                 log.debug("Fehler bei %s: %s", url, e)
 
-        log.warning(
-            "Kader für Manager %s in Liga %s nicht abrufbar (404 bei allen Versuchen)",
-            manager_user_id, league_id
-        )
         return []
 
 
@@ -314,7 +310,8 @@ def main():
             first_m = raw_standings[0]
             log.info("Manager-Antwort Keys (Beispiel): %s", list(first_m.keys()))
             log.info("Manager 'sp' vs 'pa' (Beispiel): %s vs %s", first_m.get("sp"), first_m.get("pa"))
-            log.info("Manager 'spl' (Beispiel): %s", first_m.get("spl"))
+            log.info("Manager 'spl' / 'shpl' / 'hll' (Beispiel): %s / %s / %s", 
+                     first_m.get("spl"), first_m.get("shpl"), first_m.get("hll"))
 
         # Kader pro Manager
         squads = {}
