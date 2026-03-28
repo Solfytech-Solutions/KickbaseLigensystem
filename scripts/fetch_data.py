@@ -130,13 +130,13 @@ class KickbaseClient:
 
     def get_squad(self, league_id: str, manager_user_id: str) -> list[dict]:
         """Kader eines Managers in einer bestimmten Liga."""
-        # v4: Versuch 1 (Singular 'lineup' ist oft korrekt in v4)
+        # v4: Versuch 1 (Ranking-Detail Endpunkt)
         resp = self.session.get(
-            f"{BASE_URL}/v4/leagues/{league_id}/lineup/{manager_user_id}",
+            f"{BASE_URL}/v4/leagues/{league_id}/ranking/{manager_user_id}",
             timeout=30,
         )
-        # v4: Versuch 2 (User-basiert)
         if resp.status_code != 200:
+            # v4: Versuch 2 (User-Players)
             resp = self.session.get(
                 f"{BASE_URL}/v4/leagues/{league_id}/users/{manager_user_id}/players",
                 timeout=30,
@@ -144,10 +144,13 @@ class KickbaseClient:
             
         if resp.status_code == 200:
             data = resp.json()
-            # In v4 können Spieler unter 'players', 'p', 'pl' oder direkt im Root liegen
+            # Spieler können tief geschachtelt sein
             players = data.get("players") or data.get("items") or data.get("p") or data.get("pl") or data.get("lineup") or []
-            if not players and isinstance(data, list):
-                players = data
+            if not players and isinstance(data, dict):
+                # Manchmal ist es { "u": { "pl": [...] } }
+                u_obj = data.get("u") or {}
+                if isinstance(u_obj, dict):
+                    players = u_obj.get("pl") or u_obj.get("players") or []
             return players
 
         # Letzter Fallback v2/v3
@@ -300,10 +303,16 @@ def main():
             log.warning("Keine Standings für Liga %s", league_id)
             continue
 
+        # Sortiere nach Punkten (sp) absteigend
+        raw_standings.sort(key=lambda x: x.get("sp") or 0, reverse=True)
+
         cleaned_standings = [_clean_manager(m, i + 1) for i, m in enumerate(raw_standings)]
 
         if cleaned_standings:
-            log.info("Manager-Antwort Keys (Beispiel): %s", list(raw_standings[0].keys()))
+            first_m = raw_standings[0]
+            log.info("Manager-Antwort Keys (Beispiel): %s", list(first_m.keys()))
+            log.info("Manager 'sp' vs 'pa' (Beispiel): %s vs %s", first_m.get("sp"), first_m.get("pa"))
+            log.info("Manager 'spl' (Beispiel): %s", first_m.get("spl"))
 
         # Kader pro Manager
         squads = {}
