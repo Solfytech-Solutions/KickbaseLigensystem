@@ -342,8 +342,16 @@ def main():
 
         # Mapping bauen aus all diesen Quellen
         meta_map = {}
-        for key in ["il", "ia", "cpi"]:
+        for key in ["il", "ia", "cpi", "ti"]:
             src = ranking_data.get(key)
+            # Falls Kickbase JSON in Strings versteckt (oft in v4)
+            if isinstance(src, str) and src.strip().startswith(("{", "[")):
+                try:
+                    src = json.loads(src)
+                    log.info("   ✓ Key '%s' erfolgreich als JSON dekodiert", key)
+                except:
+                    pass
+
             if isinstance(src, list):
                 for item in src:
                     iid = str(item.get("i") or item.get("id") or "")
