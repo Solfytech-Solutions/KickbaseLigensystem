@@ -91,7 +91,8 @@ class KickbaseClient:
         if resp.status_code == 200:
             data = resp.json()
             log.info("Leagues-Antwort Keys: %s", list(data.keys()))
-            leagues = data.get("leagues") or data.get("items") or data.get("l") or []
+            # 'lins' scheint der aktuelle v4 Key für 'Leagues In' zu sein
+            leagues = data.get("leagues") or data.get("items") or data.get("lins") or data.get("l") or []
         
         if not leagues:
             # Fallback v2/v3
@@ -99,6 +100,10 @@ class KickbaseClient:
             resp2 = self.session.get(f"{BASE_URL}/user/leagues", timeout=30)
             if resp2.status_code == 200:
                 leagues = resp2.json().get("leagues") or []
+        
+        # Manchmal ist die Antwort ein Dictionary und die Ligen liegen in einer Liste darin (z.B. 'leagues')
+        if isinstance(leagues, dict):
+            leagues = leagues.get("leagues") or leagues.get("items") or []
 
         log.info("Gefundene Ligen: %d", len(leagues))
         return leagues
