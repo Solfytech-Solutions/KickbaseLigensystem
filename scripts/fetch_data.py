@@ -141,12 +141,18 @@ class KickbaseClient:
         """Versucht Meta-Daten für eine Liste von Player-IDs zu holen."""
         if not player_ids:
             return []
-        # v4 Bulk Details (Vermutung)
-        ids_str = ",".join(player_ids[:50]) # Max 50
-        resp = self.session.get(f"{BASE_URL}/v4/players?ids={ids_str}", timeout=15)
-        if resp.status_code == 200:
-            return resp.json().get("players") or resp.json().get("items") or []
-        return []
+        
+        results = []
+        # Da Bulk oft 404 liefert, probieren wir es für die ersten 5-10 Spieler einzeln
+        # um zu sehen, ob der Endpoint überhaupt existiert.
+        for pid in player_ids[:15]:
+            try:
+                resp = self.session.get(f"{BASE_URL}/v4/players/{pid}", timeout=5)
+                if resp.status_code == 200:
+                    results.append(resp.json())
+            except:
+                pass
+        return results
 
     def get_squad(self, league_id: str, manager_user_id: str) -> list[dict]:
         """Kader eines Managers in einer bestimmten Liga."""
