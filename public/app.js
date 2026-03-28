@@ -143,7 +143,13 @@ function renderStandings(standings) {
     $tableBody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:32px">Keine Daten vorhanden</td></tr>`;
     return;
   }
-  standings.forEach((m) => {
+  
+  // Sicherstellen, dass nach Punkten sortiert ist (Absteigend)
+  const sorted = [...standings].sort((a, b) => (b.points || 0) - (a.points || 0));
+  
+  sorted.forEach((m, index) => {
+    // Rang neu berechnen falls nötig (optional, wir nutzen m.rank)
+    const rank = m.rank; 
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td class="col-rank"><span class="rank-badge ${rankClass(m.rank)}">${m.rank}</span></td>

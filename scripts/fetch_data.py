@@ -130,15 +130,21 @@ class KickbaseClient:
 
     def get_squad(self, league_id: str, manager_user_id: str) -> list[dict]:
         """Kader eines Managers in einer bestimmten Liga."""
-        # v4: Versuch 1 (Ranking-Detail Endpunkt)
+        # v4: Versuch 1 (User-Players v4)
         resp = self.session.get(
-            f"{BASE_URL}/v4/leagues/{league_id}/ranking/{manager_user_id}",
+            f"{BASE_URL}/v4/leagues/{league_id}/users/{manager_user_id}/players",
             timeout=30,
         )
+        # v4: Versuch 2 (Ranking Detail)
         if resp.status_code != 200:
-            # v4: Versuch 2 (User-Players)
             resp = self.session.get(
-                f"{BASE_URL}/v4/leagues/{league_id}/users/{manager_user_id}/players",
+                f"{BASE_URL}/v4/leagues/{league_id}/ranking/{manager_user_id}",
+                timeout=30,
+            )
+        # v4: Versuch 3 (Lineup Singular)
+        if resp.status_code != 200:
+            resp = self.session.get(
+                f"{BASE_URL}/v4/leagues/{league_id}/lineup/{manager_user_id}",
                 timeout=30,
             )
             
@@ -148,18 +154,18 @@ class KickbaseClient:
             players = data.get("players") or data.get("items") or data.get("p") or data.get("pl") or data.get("lineup") or []
             if not players and isinstance(data, dict):
                 # Manchmal ist es { "u": { "pl": [...] } }
-                u_obj = data.get("u") or {}
+                u_obj = data.get("u") or data.get("user") or {}
                 if isinstance(u_obj, dict):
-                    players = u_obj.get("pl") or u_obj.get("players") or []
+                    players = u_obj.get("pl") or u_obj.get("players") or u_obj.get("p") or []
             return players
 
-        # Letzter Fallback v2/v3
+        # Letzter Fallback v2/v3 (Standard-Weg ohne v4)
         resp_fb = self.session.get(f"{BASE_URL}/leagues/{league_id}/users/{manager_user_id}/players", timeout=30)
         if resp_fb.status_code == 200:
             return resp_fb.json().get("players") or []
 
         log.warning(
-            "Kader für Manager %s in Liga %s nicht abrufbar (v4 Status: %s)",
+            "Kader für Manager %s in Liga %s nicht abrufbar (Status: %s)",
             manager_user_id, league_id, resp.status_code,
         )
         return []
