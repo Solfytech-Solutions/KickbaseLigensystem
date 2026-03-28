@@ -321,17 +321,40 @@ def main():
             log.warning("Keine Standings für Liga %s", league_id)
             continue
 
-        # Debug: Was steckt in 'il' oder 'nd'?
-        il_data = ranking_data.get("il") or []
-        log.info("   'il' (Teams/Info) enthält %d Einträge", len(il_data) if isinstance(il_data, list) else 0)
-        
-        # Mapping bauen aus 'il' (oft sind das die Team/Player-Metadaten in v4)
+        # Debug: Was steckt in den anderen Keys?
+        for key in ["il", "nd", "ia", "ti", "cpi", "day"]:
+            val = ranking_data.get(key)
+            if isinstance(val, (list, dict)):
+                count = len(val)
+                log.info("   Key '%s' enthält %d Einträge", key, count)
+                if count > 0:
+                    try:
+                        sample = val[0] if isinstance(val, list) else list(val.items())[0]
+                        log.info("   Probe von '%s': %s", key, str(sample)[:200])
+                    except:
+                        pass
+            else:
+                log.info("   Key '%s' ist kein Container: %s", key, type(val))
+
+        # Mapping bauen aus all diesen Quellen
         meta_map = {}
-        if isinstance(il_data, list):
-            for item in il_data:
-                iid = str(item.get("i") or item.get("id") or "")
-                if iid:
-                    meta_map[iid] = item
+        for key in ["il", "ia", "cpi"]:
+            src = ranking_data.get(key)
+            if isinstance(src, list):
+                for item in src:
+                    iid = str(item.get("i") or item.get("id") or "")
+                    if iid:
+                        meta_map[iid] = item
+            elif isinstance(src, dict):
+                for iid, item in src.items():
+                    meta_map[str(iid)] = item
+                    
+        # 'nd' ist oft ein Namen-Wörterbuch { "ID": "Name" }
+        name_dict = ranking_data.get("nd") or {}
+        if isinstance(name_dict, dict):
+            for iid, name in name_dict.items():
+                if str(iid) not in meta_map:
+                    meta_map[str(iid)] = {"i": iid, "n": name}
 
         # Sortiere nach Punkten (sp) absteigend
         raw_standings.sort(key=lambda x: x.get("sp") or 0, reverse=True)
