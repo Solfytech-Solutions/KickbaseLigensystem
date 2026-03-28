@@ -130,43 +130,39 @@ class KickbaseClient:
 
     def get_squad(self, league_id: str, manager_user_id: str) -> list[dict]:
         """Kader eines Managers in einer bestimmten Liga."""
-        # v4: Versuch 1 (User-Players v4)
-        resp = self.session.get(
+        # Liste möglicher Endpunkte (v4 und Fallbacks)
+        endpoints = [
+            f"{BASE_URL}/leagues/{league_id}/users/{manager_user_id}/players",  # Klassisch v2/v3
             f"{BASE_URL}/v4/leagues/{league_id}/users/{manager_user_id}/players",
-            timeout=30,
-        )
-        # v4: Versuch 2 (Ranking Detail)
-        if resp.status_code != 200:
-            resp = self.session.get(
-                f"{BASE_URL}/v4/leagues/{league_id}/ranking/{manager_user_id}",
-                timeout=30,
-            )
-        # v4: Versuch 3 (Lineup Singular)
-        if resp.status_code != 200:
-            resp = self.session.get(
-                f"{BASE_URL}/v4/leagues/{league_id}/lineup/{manager_user_id}",
-                timeout=30,
-            )
-            
-        if resp.status_code == 200:
-            data = resp.json()
-            # Spieler können tief geschachtelt sein
-            players = data.get("players") or data.get("items") or data.get("p") or data.get("pl") or data.get("lineup") or []
-            if not players and isinstance(data, dict):
-                # Manchmal ist es { "u": { "pl": [...] } }
-                u_obj = data.get("u") or data.get("user") or {}
-                if isinstance(u_obj, dict):
-                    players = u_obj.get("pl") or u_obj.get("players") or u_obj.get("p") or []
-            return players
-
-        # Letzter Fallback v2/v3 (Standard-Weg ohne v4)
-        resp_fb = self.session.get(f"{BASE_URL}/leagues/{league_id}/users/{manager_user_id}/players", timeout=30)
-        if resp_fb.status_code == 200:
-            return resp_fb.json().get("players") or []
+            f"{BASE_URL}/v4/leagues/{league_id}/lineup/{manager_user_id}",
+            f"{BASE_URL}/v4/leagues/{league_id}/ranking/{manager_user_id}",
+        ]
+        
+        for url in endpoints:
+            try:
+                resp = self.session.get(url, timeout=10)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    # Verschiedene Keys für Spielerlisten in der API
+                    players = []
+                    if isinstance(data, list):
+                        players = data
+                    elif isinstance(data, dict):
+                        players = data.get("players") or data.get("items") or data.get("p") or data.get("pl") or data.get("lineup") or []
+                        # Suche tiefer in User-Objekten
+                        if not players:
+                            u_obj = data.get("u") or data.get("user") or {}
+                            if isinstance(u_obj, dict):
+                                players = u_obj.get("pl") or u_obj.get("players") or u_obj.get("p") or []
+                    
+                    if players:
+                        return players
+            except Exception as e:
+                log.debug("Fehler bei %s: %s", url, e)
 
         log.warning(
-            "Kader für Manager %s in Liga %s nicht abrufbar (Status: %s)",
-            manager_user_id, league_id, resp.status_code,
+            "Kader für Manager %s in Liga %s nicht abrufbar (404 bei allen Versuchen)",
+            manager_user_id, league_id
         )
         return []
 
