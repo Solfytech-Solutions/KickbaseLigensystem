@@ -130,22 +130,31 @@ class KickbaseClient:
 
     def get_squad(self, league_id: str, manager_user_id: str) -> list[dict]:
         """Kader eines Managers in einer bestimmten Liga."""
+        # v4: Versuch 1 (Häufigster v4 Endpunkt)
         resp = self.session.get(
-            f"{BASE_URL}/v4/leagues/{league_id}/lineups/{manager_user_id}",
+            f"{BASE_URL}/v4/leagues/{league_id}/users/{manager_user_id}/players",
             timeout=30,
         )
+        # v4: Versuch 2 (Anderer v4 Variant)
+        if resp.status_code != 200:
+            resp = self.session.get(
+                f"{BASE_URL}/v4/leagues/{league_id}/lineups/{manager_user_id}",
+                timeout=30,
+            )
+            
         if resp.status_code == 200:
             data = resp.json()
+            # In v4 können Spieler unter 'players', 'p' oder 'pl' liegen
             players = data.get("players") or data.get("items") or data.get("p") or data.get("pl") or []
             return players
 
-        # Fallback
+        # Fallback v2/v3
         resp2 = self.session.get(
             f"{BASE_URL}/leagues/{league_id}/users/{manager_user_id}/players",
             timeout=30,
         )
         if resp2.status_code == 200:
-            return resp2.json().get("players", [])
+            return resp2.json().get("players") or []
 
         log.warning(
             "Kader für Manager %s in Liga %s nicht abrufbar: %s",
@@ -202,8 +211,12 @@ def init_firestore():
 
 def write_league_to_firestore(db, league: dict, standings: list, squads: dict):
     """Schreibt alle Daten einer Liga in Firestore."""
-    league_id = str(league.get("id", ""))
-    league_name = league.get("name", f"Liga {league_id}")
+    league_id = str(league.get("i") or league.get("id") or "")
+    league_name = league.get("n") or league.get("name") or league_id
+
+    if not league_id:
+        log.error("Kann Liga ohne ID nicht speichern: %s", league)
+        return
 
     log.info("Schreibe Liga '%s' (%s) in Firestore ...", league_name, league_id)
 
