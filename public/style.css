@@ -1,136 +1,129 @@
 /* ═══════════════════════════════════════════════════
-   Kickbase Dashboard "Bega/Humfeld Elite Redesign"
-   Style: Deep Sea Pitch · Neon Emerald · Glassmorphism
-   Typography: Outfit (Headings) · Inter (UI Elements)
+   SG Bega/Humfeld – Kickbase Ligen
+   Farben aus dem Vereinswappen: Rot #ce111c auf Weiß
+   Typografie: Outfit (Überschriften) · Inter (UI)
 ═══════════════════════════════════════════════════ */
-
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap');
 
 /* ── Reset & Base ── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  /* Colors */
-  --bg-base:          #030507;
-  --bg-surface:       #080b0f;
-  --bg-card:          rgba(255, 255, 255, 0.03);
-  --bg-card-hover:    rgba(255, 255, 255, 0.07);
-  
-  --accent:           #00f576; /* Emerald Green */
-  --accent-glow:      rgba(0, 245, 118, 0.25);
-  --blue:             #3b82f6; /* Cyber Blue */
-  --blue-glow:        rgba(59, 130, 246, 0.2);
-  
-  --border:           rgba(255, 255, 255, 0.06);
-  --border-active:    rgba(255, 255, 255, 0.15);
-  
-  --text-primary:     #ffffff;
-  --text-secondary:   #94a3b8;
-  --text-muted:       #64748b;
-  
-  /* Status Colors */
-  --gold:             #fbbf24;
-  --silver:           #cbd5e1;
-  --bronze:           #d97706;
-  --red:              #ff4d4d;
-  
-  /* Utils */
-  --radius-sm:        8px;
-  --radius-md:        14px;
-  --radius-lg:        24px;
-  --transition:       0.4s cubic-bezier(0.16, 1, 0.3, 1);
-  --blur:             20px;
+  /* Vereinsrot – direkt aus dem Wappen entnommen */
+  --red:          #ce111c;
+  --red-dark:     #9d0d15;
+  --red-light:    #e8323d;
+  --red-tint:     #fdf1f2;
+
+  /* Flächen & Text */
+  --bg:           #f2f3f5;
+  --surface:      #ffffff;
+  --border:       #e5e8ec;
+  --text:         #15181d;
+  --text-secondary: #5b6572;
+  --text-muted:   #8d97a4;
+
+  /* Podium */
+  --gold:         #d9a520;
+  --silver:       #a2acb8;
+  --bronze:       #bd7940;
+
+  --radius-sm:    9px;
+  --radius-md:    14px;
+  --radius-lg:    18px;
+  --shadow:       0 1px 2px rgba(21, 24, 29, 0.04), 0 8px 24px rgba(21, 24, 29, 0.06);
+  --transition:   0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 html { scroll-behavior: smooth; }
 
 body {
   font-family: 'Inter', system-ui, sans-serif;
-  background: var(--bg-base);
-  color: var(--text-primary);
+  background: var(--bg);
+  color: var(--text);
   min-height: 100vh;
-  overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
 }
 
-/* ── Elite Background Glows ── */
-body::before, body::after {
-  content: '';
-  position: fixed;
-  width: 60vw;
-  height: 60vw;
-  border-radius: 50%;
-  z-index: -1;
-  filter: blur(120px);
-  opacity: 0.15;
-  pointer-events: none;
-}
-body::before {
-  top: -20vh;
-  left: -20vw;
-  background: radial-gradient(circle, var(--accent) 0%, transparent 70%);
-}
-body::after {
-  bottom: -20vh;
-  right: -20vw;
-  background: radial-gradient(circle, var(--blue) 0%, transparent 70%);
-}
+/* ── Utilities ── */
+.hidden { display: none !important; }
 
 /* ── Header ── */
 .app-header {
   position: sticky;
   top: 0;
-  z-index: 1000;
-  background: rgba(3, 5, 7, 0.6);
-  backdrop-filter: blur(var(--blur));
-  -webkit-backdrop-filter: blur(var(--blur));
-  border-bottom: 1px solid var(--border);
-  height: 72px;
+  z-index: 100;
+  background: linear-gradient(135deg, var(--red) 0%, var(--red-dark) 100%);
+  color: #fff;
+  box-shadow: 0 2px 12px rgba(157, 13, 21, 0.25);
 }
 .header-inner {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 0 32px;
-  height: 100%;
+  padding: 14px 32px;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 16px;
 }
-.logo { display: flex; align-items: center; gap: 14px; }
-.logo-icon { 
-  font-size: 1.8rem;
-  filter: drop-shadow(0 0 10px var(--accent-glow));
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
 }
-.logo-text {
+/* Das Wappen hat einen weißen Hintergrund – deshalb bewusst in ein weißes
+   Feld gesetzt, damit es auf dem roten Header sauber sitzt. */
+.brand-logo {
+  flex-shrink: 0;
+  width: 52px;
+  height: 52px;
+  border-radius: var(--radius-md);
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+}
+.brand-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+.brand-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+  min-width: 0;
+}
+.brand-text strong {
   font-family: 'Outfit', sans-serif;
-  font-size: 1.25rem;
-  font-weight: 500;
-  color: var(--text-secondary);
-  letter-spacing: -0.02em;
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.logo-text strong { 
-    color: var(--text-primary); 
-    font-weight: 800;
-    background: linear-gradient(135deg, #fff 30%, var(--accent) 100%);
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
+.brand-text small {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.75);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 .last-updated {
+  flex-shrink: 0;
   font-size: 0.72rem;
   font-weight: 600;
-  color: var(--text-muted);
-  background: var(--bg-card);
-  border: 1px solid var(--border);
+  color: rgba(255, 255, 255, 0.92);
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.22);
   padding: 6px 14px;
   border-radius: 99px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  animation: fadeIn 1s ease;
+  white-space: nowrap;
 }
-
-/* ── Utilities ── */
-.hidden { display: none !important; }
 
 /* ── Lade- & Fehlerzustand ── */
 .loading-state,
@@ -139,123 +132,121 @@ body::after {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 20px;
+  gap: 18px;
   padding: 80px 24px;
   text-align: center;
   color: var(--text-secondary);
 }
 .error-icon { font-size: 2.5rem; }
+.spinner {
+  width: 42px;
+  height: 42px;
+  border: 3px solid var(--border);
+  border-top-color: var(--red);
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+@keyframes spin { 100% { transform: rotate(360deg); } }
 
-/* ── Main Layout ── */
+/* ── Layout ── */
 .main-content {
   max-width: 1200px;
-  margin: 40px auto 100px;
+  margin: 36px auto 80px;
   padding: 0 32px;
 }
 
-/* Alle Ligen nebeneinander – ab einer Liga pro Spalte, auf breiten
-   Bildschirmen zwei. So sieht jeder Besucher sofort beide Tabellen. */
+/* Alle Ligen gleichzeitig – auf breiten Bildschirmen nebeneinander,
+   sonst untereinander. So sieht jeder Besucher immer beide Tabellen. */
+/* min() verhindert, dass die Spalte auf schmalen Displays breiter wird als
+   der Bildschirm; min-width:0 an der Karte erlaubt ihr, unter die
+   Inhaltsbreite zu schrumpfen (Grid-Items haben sonst min-width:auto). */
 .leagues-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
-  gap: 40px;
+  grid-template-columns: repeat(auto-fit, minmax(min(430px, 100%), 1fr));
+  gap: 28px;
   align-items: start;
 }
 
-/* ── Standings Section ── */
-.section-title {
-  font-family: 'Outfit', sans-serif;
-  font-size: 1.75rem;
-  font-weight: 800;
-  margin-bottom: 24px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
+/* ── Liga-Karte ── */
+.league-card {
+  min-width: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--red);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  animation: slideInUp 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
-.section-title::after {
-  content: '';
-  height: 2px;
-  flex: 1;
-  background: linear-gradient(90deg, var(--border), transparent);
+.league-card:nth-child(2) { animation-delay: 0.08s; }
+.league-card:nth-child(n+3) { animation-delay: 0.16s; }
+
+.league-card-header {
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.league-titel {
+  font-family: 'Outfit', sans-serif;
+  font-size: 1.4rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+.league-meta {
+  display: block;
+  margin-top: 3px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--text-muted);
 }
 
-.standings-table-wrapper {
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-  box-shadow: 0 30px 60px rgba(0,0,0,0.5);
-  animation: slideInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1);
-}
+/* ── Tabelle ── */
+.standings-table-wrapper { overflow-x: auto; }
 .standings-table {
   width: 100%;
   border-collapse: collapse;
 }
 .standings-table th {
-  padding: 20px 24px;
+  padding: 12px 16px;
   text-align: left;
-  font-size: 0.75rem;
+  font-size: 0.68rem;
   font-weight: 700;
   text-transform: uppercase;
+  letter-spacing: 0.09em;
   color: var(--text-muted);
-  letter-spacing: 0.1em;
+  background: #fafbfc;
   border-bottom: 1px solid var(--border);
+  white-space: nowrap;
 }
 .standings-table td {
-  padding: 16px 24px;
+  padding: 12px 16px;
   vertical-align: middle;
   border-bottom: 1px solid var(--border);
 }
-.standings-table tbody tr {
-  animation: slideInUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  opacity: 0;
-  transition: background var(--transition);
-  cursor: default;
-}
-.standings-table tbody tr:nth-child(1) { animation-delay: 0.05s; }
-.standings-table tbody tr:nth-child(2) { animation-delay: 0.10s; }
-.standings-table tbody tr:nth-child(3) { animation-delay: 0.15s; }
-.standings-table tbody tr:nth-child(4) { animation-delay: 0.20s; }
-.standings-table tbody tr:nth-child(n+5) { animation-delay: 0.25s; }
+.standings-table tbody tr:last-child td { border-bottom: none; }
+.standings-table tbody tr { transition: background var(--transition); }
 
-.standings-table tr:hover td {
-  background: rgba(255,255,255,0.02);
-}
-.standings-table tr:last-child td { border: none; }
-
-/* Rank Badges Redesign */
-.rank-badge {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px; height: 34px;
-  border-radius: 10px;
-  font-weight: 800;
-  font-family: 'Outfit';
-  font-size: 0.9rem;
-  transition: transform 0.3s ease;
-}
-.rank-1 { background: linear-gradient(135deg, var(--gold), #d97706); color: #000; box-shadow: 0 0 15px rgba(251,191,36,0.3); }
-.rank-2 { background: linear-gradient(135deg, var(--silver), #64748b); color: #000; }
-.rank-3 { background: linear-gradient(135deg, var(--bronze), #78350f); color: #fff; }
-.rank-other { background: var(--bg-card); color: var(--text-muted); }
+.col-points, .col-value { text-align: right; }
+.standings-table th.col-points,
+.standings-table th.col-value { text-align: right; }
+.col-rank { width: 1%; }
 
 .manager-name {
   font-family: 'Outfit', sans-serif;
   font-weight: 600;
-  font-size: 1.05rem;
+  font-size: 1rem;
 }
-.col-points .points-val {
+.points-val {
   font-family: 'Outfit', sans-serif;
   font-weight: 800;
-  font-size: 1.2rem;
-  color: var(--accent);
+  font-size: 1.05rem;
+  color: var(--red);
+  font-variant-numeric: tabular-nums;
 }
-
-.col-value .team-value {
-  font-size: 0.85rem;
+.team-value {
+  font-size: 0.82rem;
   font-weight: 600;
   color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
 }
 .empty-row {
   text-align: center;
@@ -263,28 +254,126 @@ body::after {
   padding: 32px;
 }
 
-/* ── Animations ── */
-@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-@keyframes slideInUp {
-  from { opacity: 0; transform: translateY(30px); }
-  to { opacity: 1; transform: translateY(0); }
+/* ── Platz-Badges ── */
+.rank-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  font-family: 'Outfit', sans-serif;
+  font-weight: 800;
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+}
+.badge-platz-1 {
+  background: linear-gradient(135deg, #f2cd63, var(--gold));
+  color: #4a3400;
+  box-shadow: 0 2px 8px rgba(217, 165, 32, 0.35);
+}
+.badge-platz-2 {
+  background: linear-gradient(135deg, #d5dce3, var(--silver));
+  color: #2b323a;
+  box-shadow: 0 2px 8px rgba(162, 172, 184, 0.35);
+}
+.badge-platz-3 {
+  background: linear-gradient(135deg, #d99a63, var(--bronze));
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(189, 121, 64, 0.35);
+}
+.badge-platz-abstieg {
+  background: var(--red);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(206, 17, 28, 0.3);
+}
+.badge-platz-normal {
+  background: #eef0f3;
+  color: var(--text-muted);
 }
 
-/* ── Loading Spinner ── */
-.spinner {
-  width: 50px; height: 50px;
-  border: 2px solid var(--border);
-  border-top: 2px solid var(--accent);
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
+/* ── Zeilen-Hervorhebung ──
+   Farbiger Balken links plus dezente Tönung, damit Podium und Abstieg
+   auch ohne Farbwahrnehmung an der Badge-Beschriftung erkennbar bleiben. */
+.standings-table tbody td:first-child {
+  border-left: 3px solid transparent;
 }
-@keyframes spin { 100% { transform: rotate(360deg); } }
+.row-platz-1 td:first-child { border-left-color: var(--gold); }
+.row-platz-2 td:first-child { border-left-color: var(--silver); }
+.row-platz-3 td:first-child { border-left-color: var(--bronze); }
+.row-platz-abstieg td:first-child { border-left-color: var(--red); }
+
+.row-platz-1 { background: linear-gradient(90deg, rgba(217, 165, 32, 0.10), rgba(217, 165, 32, 0) 55%); }
+.row-platz-2 { background: linear-gradient(90deg, rgba(162, 172, 184, 0.12), rgba(162, 172, 184, 0) 55%); }
+.row-platz-3 { background: linear-gradient(90deg, rgba(189, 121, 64, 0.10), rgba(189, 121, 64, 0) 55%); }
+.row-platz-abstieg { background: var(--red-tint); }
+
+.standings-table tbody tr:hover { background-color: rgba(206, 17, 28, 0.04); }
+
+/* ── Legende ── */
+.legende {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  padding: 14px 24px 18px;
+  border-top: 1px solid var(--border);
+  background: #fafbfc;
+}
+.legende-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+.legende-dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+.dot-platz-1 { background: linear-gradient(135deg, #f2cd63, var(--gold)); }
+.dot-platz-2 { background: linear-gradient(135deg, #d5dce3, var(--silver)); }
+.dot-platz-3 { background: linear-gradient(135deg, #d99a63, var(--bronze)); }
+.dot-platz-abstieg { background: var(--red); }
+
+/* ── Animationen ── */
+@keyframes slideInUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
 
 /* ── Responsive ── */
-@media (max-width: 768px) {
-  .header-inner, .main-content { padding: 0 20px; }
+@media (max-width: 900px) {
+  .leagues-grid { grid-template-columns: 1fr; gap: 24px; }
+}
+
+@media (max-width: 640px) {
+  .header-inner { padding: 12px 18px; }
+  .main-content { padding: 0 18px; margin-top: 24px; }
+  .brand-logo { width: 44px; height: 44px; }
+  .brand-text strong { font-size: 1rem; }
+  .brand-text small { font-size: 0.68rem; }
+  .last-updated { font-size: 0.65rem; padding: 5px 10px; }
   .col-value { display: none; }
-  .section-title { font-size: 1.4rem; }
-  .leagues-grid { grid-template-columns: 1fr; gap: 32px; }
-  .standings-table th, .standings-table td { padding: 14px 16px; }
+  .league-titel { font-size: 1.2rem; }
+  .league-card-header { padding: 16px 18px 13px; }
+  .standings-table th, .standings-table td { padding: 11px 12px; }
+  .legende { padding: 12px 18px 16px; gap: 7px 14px; }
+}
+
+/* Sehr schmale Geräte: Stand-Anzeige unter den Vereinsnamen schieben */
+@media (max-width: 420px) {
+  .header-inner { flex-wrap: wrap; }
+  .last-updated { width: 100%; text-align: center; }
+}
+
+/* ── Bewegung reduzieren ── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

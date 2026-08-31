@@ -40,6 +40,15 @@ except KeyError as missing:
 _league_ids_env = os.environ.get("KICKBASE_LEAGUE_IDS", "").strip()
 FILTER_LEAGUE_IDS = [x.strip() for x in _league_ids_env.split(",") if x.strip()]
 
+# Manager, die in einer Liga nicht in der Tabelle auftauchen sollen (z. B. Admins,
+# die dort nur verwalten und nicht mitspielen). Pro Liga-ID eine Menge von
+# User-IDs – bewusst NICHT global, weil dieselben Accounts in der anderen Liga
+# ganz normal mitspielen.
+AUSGESCHLOSSENE_MANAGER = {
+    # SG Bega/Humfeld II – Christopher und Julian sind hier nur Admins
+    "6853982": {"2644886", "3185901"},
+}
+
 # Zielpfad der generierten Datei (Repo-Root/public/data/leagues.json)
 OUTPUT_PATH = Path(__file__).resolve().parent.parent / "public" / "data" / "leagues.json"
 
@@ -119,15 +128,16 @@ class KickbaseClient:
 
 # ─── Hilfsfunktionen ─────────────────────────────────────────────────────────
 
-def _clean_manager(raw: dict, rank: int) -> dict:
-    """Normalisiert einen Manager-/Standings-Eintrag."""
+def _clean_manager(raw: dict) -> dict:
+    """Normalisiert einen Manager-/Standings-Eintrag (ohne Rang)."""
     # User-Objekt kann direkt in raw oder unter 'u' liegen
     user_data = raw.get("u") if isinstance(raw.get("u"), dict) else raw
+    name = user_data.get("n") or user_data.get("name") or user_data.get("userName") or "Unbekannt"
 
     return {
-        "rank": rank,
         "userId": str(user_data.get("i") or user_data.get("userId") or raw.get("id", "")),
-        "name": user_data.get("n") or user_data.get("name") or user_data.get("userName") or "Unbekannt",
+        # Kickbase liefert Namen teils mit Leerzeichen am Ende
+        "name": str(name).strip(),
         "points": raw.get("sp") or raw.get("pt") or raw.get("points") or raw.get("totalPoints") or 0,
         "teamValue": raw.get("tv") or raw.get("teamValue") or 0,
     }
@@ -181,7 +191,24 @@ def main():
             continue
 
         raw_standings.sort(key=lambda x: x.get("sp") or 0, reverse=True)
-        standings = [_clean_manager(m, i + 1) for i, m in enumerate(raw_standings)]
+        standings = [_clean_manager(m) for m in raw_standings]
+
+        # Admins o. Ä. entfernen, bevor die Ränge vergeben werden – so bleibt
+        # die Tabelle lückenlos von 1 an durchnummeriert.
+        ausgeschlossen = AUSGESCHLOSSENE_MANAGER.get(league_id, set())
+        if ausgeschlossen:
+            vorher = len(standings)
+            entfernt = [m["name"] for m in standings if m["userId"] in ausgeschlossen]
+            standings = [m for m in standings if m["userId"] not in ausgeschlossen]
+            log.info("  ⊘ %d von %d Managern ausgeschlossen: %s",
+                     vorher - len(standings), vorher, ", ".join(entfernt) or "–")
+
+        for i, manager in enumerate(standings):
+            manager["rank"] = i + 1
+
+        if not standings:
+            log.warning("Liga %s hat nach dem Ausschluss keine Manager mehr – übersprungen", league_id)
+            continue
 
         result_leagues.append({
             "id": league_id,

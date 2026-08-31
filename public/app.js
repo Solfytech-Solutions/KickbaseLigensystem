@@ -9,6 +9,22 @@
 const DATA_URL = "data/leagues.json";
 
 // ────────────────────────────────────────────────────────────
+// LIGA-KONFIGURATION
+// ────────────────────────────────────────────────────────────
+// Bestimmt Anzeige-Reihenfolge, Überschrift und Anzahl der Abstiegsplätze
+// (= die letzten N Plätze der Tabelle). Die IDs stammen aus Kickbase und
+// stehen in data/leagues.json.
+// Ligen, die hier nicht aufgeführt sind, werden hinten alphabetisch
+// angehängt und haben keine Abstiegsplätze.
+const LIGEN = [
+  { id: "3648767", titel: "1. Liga", absteiger: 2 },
+  { id: "6853982", titel: "2. Liga", absteiger: 0 },
+];
+
+// Immer die ersten drei Plätze als Podium hervorheben
+const PODIUM_PLAETZE = 3;
+
+// ────────────────────────────────────────────────────────────
 // DOM-REFERENZEN
 // ────────────────────────────────────────────────────────────
 const $loading     = document.getElementById("loadingState");
@@ -39,15 +55,8 @@ function formatDate(iso) {
   });
 }
 
-function rankClass(rank) {
-  if (rank === 1) return "rank-1";
-  if (rank === 2) return "rank-2";
-  if (rank === 3) return "rank-3";
-  return "rank-other";
-}
-
 function escHtml(str) {
-  if (!str) return "";
+  if (str === null || str === undefined) return "";
   return String(str)
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -62,30 +71,82 @@ function showError(msg) {
   $error.classList.remove("hidden");
 }
 
+/** Bringt die Ligen in die konfigurierte Reihenfolge und hängt die Konfig an. */
+function ligenOrdnen(leagues) {
+  const konfiguriert = [];
+  const rest = [];
+
+  leagues.forEach((lg) => {
+    const konfig = LIGEN.find((k) => k.id === String(lg.id));
+    if (konfig) {
+      konfiguriert.push({ ...lg, konfig, position: LIGEN.indexOf(konfig) });
+    } else {
+      rest.push({ ...lg, konfig: { titel: lg.name, absteiger: 0 } });
+    }
+  });
+
+  konfiguriert.sort((a, b) => a.position - b.position);
+  rest.sort((a, b) => (a.name || "").localeCompare(b.name || "", "de"));
+
+  return [...konfiguriert, ...rest];
+}
+
 // ────────────────────────────────────────────────────────────
 // RENDERING
 // ────────────────────────────────────────────────────────────
 
-function buildLeagueCard(league) {
-  const section = document.createElement("section");
-  section.className = "league-section";
+/**
+ * Ordnet einem Platz seine Auszeichnung zu.
+ * Das Podium hat Vorrang, damit ein Platz in einer sehr kleinen Liga nicht
+ * gleichzeitig als Podium und als Abstiegsplatz markiert wird.
+ */
+function platzKlasse(rank, anzahl, absteiger) {
+  if (rank <= PODIUM_PLAETZE) return `platz-${rank}`;
+  if (absteiger > 0 && rank > anzahl - absteiger) return "platz-abstieg";
+  return "platz-normal";
+}
 
-  const standings = [...(league.standings || [])]
-    .sort((a, b) => (a.rank || 0) - (b.rank || 0));
+function buildLegende(absteiger) {
+  const eintraege = [
+    `<span class="legende-item"><span class="legende-dot dot-platz-1"></span>Platz 1</span>`,
+    `<span class="legende-item"><span class="legende-dot dot-platz-2"></span>Platz 2</span>`,
+    `<span class="legende-item"><span class="legende-dot dot-platz-3"></span>Platz 3</span>`,
+  ];
+  if (absteiger > 0) {
+    eintraege.push(
+      `<span class="legende-item"><span class="legende-dot dot-platz-abstieg"></span>` +
+      `${absteiger === 1 ? "Abstiegsplatz" : `Abstiegsplätze (letzte ${absteiger})`}</span>`
+    );
+  }
+  return `<div class="legende">${eintraege.join("")}</div>`;
+}
+
+function buildLeagueCard(league) {
+  const { titel, absteiger } = league.konfig;
+  const standings = [...(league.standings || [])].sort((a, b) => (a.rank || 0) - (b.rank || 0));
+  const anzahl = standings.length;
 
   const rowsHtml = standings.length
-    ? standings.map((m) => `
-        <tr>
-          <td class="col-rank"><span class="rank-badge ${rankClass(m.rank)}">${m.rank}</span></td>
-          <td class="col-name"><span class="manager-name">${escHtml(m.name)}</span></td>
-          <td class="col-points"><span class="points-val">${m.points ?? "–"}</span></td>
-          <td class="col-value"><span class="team-value">${formatMoney(m.teamValue)}</span></td>
-        </tr>
-      `).join("")
+    ? standings.map((m) => {
+        const klasse = platzKlasse(m.rank, anzahl, absteiger);
+        return `
+          <tr class="row-${klasse}">
+            <td class="col-rank"><span class="rank-badge badge-${klasse}">${m.rank}</span></td>
+            <td class="col-name"><span class="manager-name">${escHtml(m.name)}</span></td>
+            <td class="col-points"><span class="points-val">${m.points ?? "–"}</span></td>
+            <td class="col-value"><span class="team-value">${formatMoney(m.teamValue)}</span></td>
+          </tr>
+        `;
+      }).join("")
     : `<tr><td colspan="4" class="empty-row">Keine Daten vorhanden</td></tr>`;
 
+  const section = document.createElement("section");
+  section.className = "league-card";
   section.innerHTML = `
-    <h2 class="section-title">🏆 ${escHtml(league.name)}</h2>
+    <div class="league-card-header">
+      <h2 class="league-titel">${escHtml(titel)}</h2>
+      <span class="league-meta">${escHtml(league.name)} · ${anzahl} Manager</span>
+    </div>
     <div class="standings-table-wrapper">
       <table class="standings-table">
         <thead>
@@ -99,26 +160,25 @@ function buildLeagueCard(league) {
         <tbody>${rowsHtml}</tbody>
       </table>
     </div>
+    ${buildLegende(absteiger)}
   `;
 
   return section;
 }
 
 function render(data) {
-  const leagues = data.leagues || [];
+  const leagues = ligenOrdnen(data.leagues || []);
 
   if (!leagues.length) {
     showError("Keine Liga-Daten gefunden. Bitte den GitHub-Actions-Workflow einmal manuell ausführen.");
     return;
   }
 
-  leagues.sort((a, b) => (a.name || "").localeCompare(b.name || "", "de"));
-
   $grid.innerHTML = "";
   leagues.forEach((lg) => $grid.appendChild(buildLeagueCard(lg)));
 
   const stamp = formatDate(data.generatedAt);
-  $lastUpdated.textContent = stamp ? `Aktualisiert: ${stamp}` : "";
+  $lastUpdated.textContent = stamp ? `Stand: ${stamp}` : "";
 
   $loading.classList.add("hidden");
   $error.classList.add("hidden");
