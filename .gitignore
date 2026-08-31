@@ -2,20 +2,15 @@
 .env
 *.json.secret
 
+# Generierte Daten (wird vom GitHub-Actions-Workflow bei jedem Lauf neu erzeugt)
+public/data/
+
 # Python
 __pycache__/
 *.py[cod]
 .venv/
 venv/
 env/
-
-# Firebase
-.firebase/
-firebase-debug.log
-firestore-debug.log
-
-# Node (falls firebase-tools lokal installiert)
-node_modules/
 
 # OS
 .DS_Store

@@ -129,59 +129,37 @@ body::after {
   animation: fadeIn 1s ease;
 }
 
-/* ── Navigation Tabs ── */
-.tabs-container {
-  max-width: 1200px;
-  margin: 40px auto 0;
-  padding: 0 32px;
-}
-.tabs {
+/* ── Utilities ── */
+.hidden { display: none !important; }
+
+/* ── Lade- & Fehlerzustand ── */
+.loading-state,
+.error-state {
   display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-.tab-btn {
-  cursor: pointer;
-  padding: 12px 28px;
-  border-radius: 99px;
-  border: 1px solid var(--border);
-  background: var(--bg-card);
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  padding: 80px 24px;
+  text-align: center;
   color: var(--text-secondary);
-  font-family: 'Outfit', sans-serif;
-  font-size: 0.95rem;
-  font-weight: 500;
-  transition: all var(--transition);
-  position: relative;
-  overflow: hidden;
 }
-.tab-btn::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(45deg, var(--accent), var(--blue));
-  opacity: 0;
-  transition: opacity var(--transition);
-  z-index: -1;
-}
-.tab-btn:hover {
-  transform: translateY(-2px);
-  color: #fff;
-  border-color: var(--accent);
-}
-.tab-btn.active {
-  background: var(--accent);
-  color: #000;
-  font-weight: 700;
-  border-color: var(--accent);
-  box-shadow: 0 8px 30px var(--accent-glow), 0 0 10px var(--accent-glow);
-  transform: translateY(-2px);
-}
+.error-icon { font-size: 2.5rem; }
 
 /* ── Main Layout ── */
 .main-content {
   max-width: 1200px;
   margin: 40px auto 100px;
   padding: 0 32px;
+}
+
+/* Alle Ligen nebeneinander – ab einer Liga pro Spalte, auf breiten
+   Bildschirmen zwei. So sieht jeder Besucher sofort beide Tabellen. */
+.leagues-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+  gap: 40px;
+  align-items: start;
 }
 
 /* ── Standings Section ── */
@@ -221,6 +199,11 @@ body::after {
   text-transform: uppercase;
   color: var(--text-muted);
   letter-spacing: 0.1em;
+  border-bottom: 1px solid var(--border);
+}
+.standings-table td {
+  padding: 16px 24px;
+  vertical-align: middle;
   border-bottom: 1px solid var(--border);
 }
 .standings-table tbody tr {
@@ -269,178 +252,16 @@ body::after {
   color: var(--accent);
 }
 
-/* Squad Button */
-.squad-btn {
-  padding: 8px 18px;
-  border-radius: 12px;
-  border: 1px solid var(--border);
-  background: var(--bg-card);
+.col-value .team-value {
+  font-size: 0.85rem;
+  font-weight: 600;
   color: var(--text-secondary);
-  font-size: 0.8rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all var(--transition);
 }
-.squad-btn:hover {
-  background: #fff;
-  color: #000;
-  transform: scale(1.05);
-  box-shadow: 0 4px 15px rgba(255,255,255,0.2);
-}
-
-/* ── Squads Grid ── */
-.squads-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-  gap: 24px;
-  margin-top: 32px;
-}
-.squad-card {
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  padding: 24px;
-  transition: all var(--transition);
-  position: relative;
-  overflow: hidden;
-  animation: slideInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  opacity: 0;
-}
-.squad-card:nth-child(1) { animation-delay: 0.1s; }
-.squad-card:nth-child(2) { animation-delay: 0.2s; }
-.squad-card:nth-child(3) { animation-delay: 0.3s; }
-.squad-card:nth-child(4) { animation-delay: 0.4s; }
-.squad-card:nth-child(n+5) { animation-delay: 0.5s; }
-.squad-card:hover {
-  border-color: var(--accent);
-  transform: translateY(-8px);
-  box-shadow: 0 20px 40px rgba(0,0,0,0.4);
-}
-.squad-card-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  margin-bottom: 20px;
-}
-.squad-manager {
-  font-family: 'Outfit', sans-serif;
-  font-size: 1.15rem;
-  font-weight: 700;
-}
-.squad-rank {
-  font-size: 0.75rem;
-  font-weight: 600;
+.empty-row {
+  text-align: center;
   color: var(--text-muted);
-  background: var(--bg-card);
-  padding: 4px 10px;
-  border-radius: 8px;
+  padding: 32px;
 }
-
-.player-pill {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 14px;
-  background: rgba(255,255,255,0.02);
-  border-radius: 12px;
-  margin-bottom: 8px;
-  border: 1px solid transparent;
-  transition: var(--transition);
-}
-.player-pill:hover {
-  background: rgba(255,255,255,0.05);
-  border-color: var(--border);
-}
-.pos-badge {
-  width: 32px; height: 18px;
-  display: flex; align-items: center; justify-content: center;
-  border-radius: 5px;
-  font-size: 0.6rem;
-  font-weight: 800;
-  letter-spacing: 0.05em;
-  background: var(--bg-card);
-}
-.pos-TW  { color: var(--red); box-shadow: inset 0 0 10px rgba(255,77,77,0.2); }
-.pos-ABW { color: var(--blue); box-shadow: inset 0 0 10px rgba(59,130,246,0.2); }
-.pos-MF  { color: var(--accent); box-shadow: inset 0 0 10px rgba(0,245,118,0.2); }
-.pos-STU { color: var(--gold); box-shadow: inset 0 0 10px rgba(251,191,36,0.2); }
-
-.player-pill-name {
-  flex: 1;
-  font-size: 0.88rem;
-  font-weight: 500;
-}
-.player-mv {
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--text-muted);
-}
-
-/* ── Modal (Premium Glass) ── */
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.8);
-  backdrop-filter: blur(15px);
-  z-index: 2000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-}
-.modal-card {
-  background: #0a0d12;
-  border: 1px solid var(--border-active);
-  border-radius: var(--radius-lg);
-  width: 100%;
-  max-width: 560px;
-  max-height: 80vh;
-  box-shadow: 0 40px 100px rgba(0,0,0,0.8);
-  display: flex;
-  flex-direction: column;
-}
-.modal-header {
-  padding: 28px;
-  border-bottom: 1px solid var(--border);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-.modal-header h3 {
-  font-family: 'Outfit', sans-serif;
-  font-size: 1.4rem;
-  font-weight: 700;
-}
-.modal-close {
-  width: 36px; height: 36px;
-  border-radius: 50%;
-  border: 1px solid var(--border);
-  background: var(--bg-card);
-  color: #fff;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-.modal-close:hover {
-  background: var(--red);
-  border-color: var(--red);
-  transform: rotate(90deg);
-}
-.modal-body {
-  padding: 24px;
-  overflow-y: auto;
-}
-/* Masking player name in modal for consistency */
-.modal-player {
-  padding: 14px;
-  background: var(--bg-card);
-  border-radius: var(--radius-md);
-  margin-bottom: 10px;
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  transition: 0.3s ease;
-}
-.modal-player:hover { transform: translateX(5px); background: var(--bg-card-hover); }
 
 /* ── Animations ── */
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
@@ -461,8 +282,9 @@ body::after {
 
 /* ── Responsive ── */
 @media (max-width: 768px) {
-  .header-inner, .tabs-container, .main-content { padding: 0 20px; }
-  .col-value, .col-squad { display: none; }
+  .header-inner, .main-content { padding: 0 20px; }
+  .col-value { display: none; }
   .section-title { font-size: 1.4rem; }
-  .squads-grid { grid-template-columns: 1fr; }
+  .leagues-grid { grid-template-columns: 1fr; gap: 32px; }
+  .standings-table th, .standings-table td { padding: 14px 16px; }
 }
